@@ -7,7 +7,8 @@
 #SBATCH -c 24 # number of CPU cores i.e. OpenMP threads per task
 #SBATCH -o job.out
 #SBATCH -e job.err
+
 for I in 12 24 48; do
-echo "Launching binary $I"
-srun ./bin/calculateR $I
+    echo "Launching binary $I"
+    srun ./bin/calculateR $I
 done

@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include <time.h>
 
-#define N 4 // Dimensione della matrice N x N
+#define N 2000 // default matrix size
 #define TOT (N * N)
 
 int main(int argc, char* argv[])
@@ -14,16 +14,18 @@ int main(int argc, char* argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    // Controllo sicurezza
+    // check if TOT is divisible by size
     if(TOT % size != 0) {
-        if(my_rank == 0) printf("Errore: TOT (%d) deve essere divisibile per size (%d)\n", TOT, size);
+        if(my_rank == 0) printf("Error: TOT (%d) must be divisible by size (%d)\n", TOT, size);
+
+        // Terminate all processes
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
-    printf("[Sono il processo %d di %d]\n", my_rank, size);
-
-    // Buffer locali per ogni processo (porzioni della matrice)
-    // Ogni processo riceve (N*N / size) elementi
+    printf("[Process %d/%d]\n", my_rank, size);
+    
+    // Local buffers for each process (matrix portions)
+    // Each process receives (N*N / size) elements
     int my_A[TOT/size], my_T[TOT/size];
 
     if (my_rank == 0)
