@@ -12,12 +12,17 @@ int main(int argc, char* argv[]) {
     // arguments parsing
     int n_size = N;
     int quiet = 0;
+    int benchmark = 0;
     unsigned int seed = (unsigned int)time(NULL);
 
     int pos = 0;
     for (int k = 1; k < argc; k++) {
         if (strcmp(argv[k], "--q") == 0) {
             quiet = 1;
+            continue;
+        }
+        if (strcmp(argv[k], "-b") == 0 || strcmp(argv[k], "--benchmark") == 0) {
+            benchmark = 1;
             continue;
         }
         char *end = NULL;
@@ -64,17 +69,18 @@ int main(int argc, char* argv[]) {
     int *my_A = malloc(rows_per_proc * n_size * sizeof(int));
     int *my_T = malloc(rows_per_proc * n_size * sizeof(int));
 
+    /* TIMING START */
+    double start, end, local_elaps, global_elaps;
+    MPI_Barrier(MPI_COMM_WORLD);
+    start = MPI_Wtime();
+
     /* DATA DISTRIBUTION */
     MPI_Scatter(
-        A_raw, rows_per_proc * n_size, MPI_INT, // SENDER buffer, size and valtype: "A" master's matrix
-        my_A, rows_per_proc * n_size, MPI_INT,  // RECEIVER buffer, size and valtype: each process's "local A" portion
-        0, // sender rank (master)
+        A_raw, rows_per_proc * n_size, MPI_INT,
+        my_A, rows_per_proc * n_size, MPI_INT,
+        0,
         MPI_COMM_WORLD
     );
-
-    // Per un calcolo corretto della media dei vicini senza scambio di righe (ghost cells),
-    // ogni processo qui può accedere solo ai suoi dati locali.
-    // NOTA: I bordi tra processi non saranno perfetti senza MPI_Sendrecv.
 
     /* EVERY PROCESS */
     for (int i = 0; i < rows_per_proc; i++) {
@@ -100,19 +106,34 @@ int main(int argc, char* argv[]) {
 
     /* DATA GATHERING */
     MPI_Gather(
-        my_T, rows_per_proc * n_size, MPI_INT,  // SENDER buffer, size and valtype: each process's "local T" portion 
-        T_raw, rows_per_proc * n_size, MPI_INT, // RECEIVER buffer, size and valtype: "T" master's matrix 
-        0, // receiver rank (master)
+        my_T, rows_per_proc * n_size, MPI_INT,
+        T_raw, rows_per_proc * n_size, MPI_INT,
+        0,
         MPI_COMM_WORLD
     );
 
-    if (my_rank == 0 && !quiet) {     /* MASTER */
-        printf("\n ---- RESULT ---- \n");
-        for (int i = 0; i < (n_size < 10 ? n_size : 10); i++) {
-            for (int j = 0; j < (n_size < 10 ? n_size : 10); j++) {
-                printf("%d ", T_raw[i * n_size + j]);
+    /* TIMING END */
+    end = MPI_Wtime();
+    local_elaps = end - start;
+
+    if (benchmark) {
+        printf("%d,%f\n", my_rank, local_elaps);
+    }
+
+    MPI_Reduce(&local_elaps, &global_elaps, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (my_rank == 0) {
+        if (benchmark) {
+            printf("MAX,%f\n", global_elaps);
+        } else if (!quiet) {
+            printf("tempo impiegato: %f secondi\n", global_elaps);
+            printf("\n ---- RESULT ---- \n");
+            for (int i = 0; i < (n_size < 10 ? n_size : 10); i++) {
+                for (int j = 0; j < (n_size < 10 ? n_size : 10); j++) {
+                    printf("%d ", T_raw[i * n_size + j]);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
         free(A_raw);
         free(T_raw);
