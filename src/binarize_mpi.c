@@ -82,27 +82,56 @@ int main(int argc, char* argv[]) {
         MPI_COMM_WORLD
     );
 
-    /* EVERY PROCESS */
+    /* HALO EXCHANGE: add ghost rows above and below */
+    int *my_A_plus_ghosts = malloc((rows_per_proc + 2) * n_size * sizeof(int));
+    int *upper_ghost = my_A_plus_ghosts;                 // row -1 (if exists)
+    int *local_data  = my_A_plus_ghosts + n_size;        // rows [0..rows_per_proc-1]
+    int *lower_ghost = my_A_plus_ghosts + (rows_per_proc + 1) * n_size; // row +rows_per_proc (if exists)
+
+    // copy local block into the central part of the buffer
+    memcpy(local_data, my_A, rows_per_proc * n_size * sizeof(int));
+
+    // neighbor ranks
+    int up = (my_rank == 0) ? MPI_PROC_NULL : my_rank - 1;
+    int down = (my_rank == size - 1) ? MPI_PROC_NULL : my_rank + 1;
+
+    // exchange halo rows: send first local row upward, receive lower ghost from below
+    MPI_Sendrecv(local_data, n_size, MPI_INT, up, 0,
+                 lower_ghost, n_size, MPI_INT, down, 0,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    // send last local row downward, receive upper ghost from above
+    MPI_Sendrecv(local_data + (rows_per_proc - 1) * n_size, n_size, MPI_INT, down, 1,
+                 upper_ghost, n_size, MPI_INT, up, 1,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    /* EVERY PROCESS: compute using ghost rows when available */
     for (int i = 0; i < rows_per_proc; i++) {
         for (int j = 0; j < n_size; j++) {
             float sum = 0;
             int count = 0;
 
-            // local 3x3 loop
-            for (int z = i - 1; z <= i + 1; z++) {
-                for (int w = j - 1; w <= j + 1; w++) {
-                    
-                    // check bounds within local data
-                    if (z >= 0 && z < rows_per_proc && w >= 0 && w < n_size) {
-                        sum += my_A[z * n_size + w];
+            // 3x3 neighborhood over ghost-augmented buffer
+            for (int dz = -1; dz <= 1; dz++) {
+                int rowIndex = i + 1 + dz; // +1 to account for upper ghost offset
+
+                // skip non-existing global rows at the domain boundaries
+                if (rowIndex == 0 && my_rank == 0) continue;                      // no upper neighbor globally
+                if (rowIndex == rows_per_proc + 1 && my_rank == size - 1) continue; // no lower neighbor globally
+
+                for (int dw = -1; dw <= 1; dw++) {
+                    int col = j + dw;
+                    if (col >= 0 && col < n_size) {
+                        sum += my_A_plus_ghosts[rowIndex * n_size + col];
                         count++;
                     }
                 }
             }
-            
-            my_T[i * n_size + j] = (my_A[i * n_size + j] * count > sum) ? 1 : 0;
+
+            my_T[i * n_size + j] = (local_data[i * n_size + j] * count > sum) ? 1 : 0;
         }
     }
+
+    free(my_A_plus_ghosts);
 
     /* DATA GATHERING */
     MPI_Gather(

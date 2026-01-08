@@ -1,49 +1,31 @@
 #!/bin/bash
 
-# Definiamo i percorsi dei binari
 SERIAL_BIN="./bin/binarize_serial"
 MPI_BIN="./bin/binarize_mpi"
+SIZE=2000
+SEED=42 # Seed identico per entrambi
 
-# File temporanei per il confronto
 OUT_SERIAL=".tmp_serial.out"
 OUT_MPI=".tmp_mpi.out"
 
-echo "--- Avvio verifica correttezza ---"
+echo "--- Verifica correttezza (Size: $SIZE, Seed: $SEED) ---"
 
-# 1. Esecuzione versione Seriale
-if [ -f "$SERIAL_BIN" ]; then
-    echo "Esecuzione $SERIAL_BIN..."
-    $SERIAL_BIN > "$OUT_SERIAL"
-else
-    echo "ERRORE: $SERIAL_BIN non trovato."
-    exit 1
-fi
+# Esecuzione Seriale (passiamo size e seed)
+# Filtriamo l'output per tenere solo le righe con 0 e 1
+$SERIAL_BIN $SIZE $SEED | grep -E '^[01 ]+$' > "$OUT_SERIAL"
 
-# 2. Esecuzione versione MPI (usando srun come nel tuo batch)
-if [ -f "$MPI_BIN" ]; then
-    echo "Esecuzione $MPI_BIN con srun..."
-    srun $MPI_BIN > "$OUT_MPI"
-else
-    echo "ERRORE: $MPI_BIN non trovato."
-    exit 1
-fi
+# Esecuzione MPI (stessi parametri)
+srun --ntasks=24 $MPI_BIN $SIZE $SEED | grep -E '^[01 ]+$' > "$OUT_MPI"
 
-# 3. Confronto degli output
 echo "Confronto in corso..."
 
-if diff "$OUT_SERIAL" "$OUT_MPI" > /dev/null; then
-    echo "SUCCESS: Gli output sono identici!"
-    # Pulizia file temporanei
+if diff -q "$OUT_SERIAL" "$OUT_MPI" > /dev/null; then
+    echo "SUCCESS: Gli output coincidono perfettamente!"
     rm "$OUT_SERIAL" "$OUT_MPI"
     exit 0
 else
-    echo "****************************************"
-    echo "ERRORE: Gli output sono differenti!"
-    echo "****************************************"
-    # Mostra le prime righe di differenza per debug
-    diff "$OUT_SERIAL" "$OUT_MPI" | head -n 20
-    
-    # Opzionale: commenta la riga sotto se vuoi tenere i file per ispezionarli
-    rm "$OUT_SERIAL" "$OUT_MPI"
+    echo "ERRORE: Differenza riscontrata nei dati."
+    # Mostra la riga esatta dove iniziano i problemi
+    diff -y --suppress-common-lines "$OUT_SERIAL" "$OUT_MPI" | head -n 10
     exit 1
 fi
