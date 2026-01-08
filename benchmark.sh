@@ -14,5 +14,5 @@
 
 # --- TEST MPI ---
 for I in 1080 2160 4320; do
-    srun ./bin/binarize_MPI $I
+  srun ./bin/binarize_mpi $I
 done
