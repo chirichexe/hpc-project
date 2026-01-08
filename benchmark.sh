@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=tra24_IngInfBo
+#SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:10:00
 #SBATCH --nodes=1
