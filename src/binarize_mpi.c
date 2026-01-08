@@ -126,10 +126,8 @@ int main(int argc, char* argv[]) {
         if (benchmark) {
             printf("MAX,%f\n", global_elaps);
         } else if (!quiet) {
-            printf("tempo impiegato: %f secondi\n", global_elaps);
-            printf("\n ---- RESULT ---- \n");
-            for (int i = 0; i < (n_size < 10 ? n_size : 10); i++) {
-                for (int j = 0; j < (n_size < 10 ? n_size : 10); j++) {
+            for (int i = 0; i < n_size; i++) {
+                for (int j = 0; j < n_size ; j++) {
                     printf("%d ", T_raw[i * n_size + j]);
                 }
                 printf("\n");
@@ -138,6 +136,9 @@ int main(int argc, char* argv[]) {
         free(A_raw);
         free(T_raw);
     }
+
+    // confirmation message
+    printf("Matrix bynarized with success.\n");
 
     free(my_A);
     free(my_T);
