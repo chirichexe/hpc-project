@@ -16,15 +16,15 @@ TARGETS = $(BIN_DIR)/binarize_mpi \
 all: $(BIN_DIR) $(TARGETS)
 
 # only MPI
-$(BIN_DIR)/binarize_mpi: $(SRC_DIR)/bynarize_MPI.c
+$(BIN_DIR)/binarize_mpi: $(SRC_DIR)/binarize_mpi.c
 	$(CC_MPI) $(CFLAGS) $< -o $@
 
 # only OpenMP
-$(BIN_DIR)/binarize_omp: $(SRC_DIR)/bynarize_OMP.c
+$(BIN_DIR)/binarize_omp: $(SRC_DIR)/binarize_omp.c
 	$(CC_SERIAL) $(CFLAGS) $(OMP_FLAGS) $< -o $@
 
 # only pure C
-$(BIN_DIR)/binarize_serial: $(SRC_DIR)/bynarize_serial.c
+$(BIN_DIR)/binarize_serial: $(SRC_DIR)/binarize_serial.c
 	$(CC_SERIAL) $(CFLAGS) $< -o $@
 
 # cleanup
