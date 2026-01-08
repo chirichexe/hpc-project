@@ -15,5 +15,5 @@
 # --- TEST MPI ---
 echo "--- INIZIO TEST MPI ---"
 for I in 1000 2000 4000; do
-    srun -n 24 ./bin/bynarize_mpi $I
+  srun -n 24 ./bin/binarize_mpi $I
 done
