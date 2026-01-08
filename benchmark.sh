@@ -13,7 +13,6 @@
 # module load openmpi
 
 # --- TEST MPI ---
-echo "--- INIZIO TEST MPI ---"
-for I in 1000 2000 4000; do
-  srun -n 24 ./bin/binarize_mpi $I
+for I in 1080 2160 4320; do
+    srun ./bin/binarize_MPI $I
 done
