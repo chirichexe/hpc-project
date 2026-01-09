@@ -95,7 +95,7 @@ int main( int argc, char* argv[] ) {
     }
     
     // confirmation message
-    printf("Matrix bynarized with success.\n");
+    //printf("Matrix bynarized with success.\n");
 
     // free memory
     free(A);
