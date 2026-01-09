@@ -52,10 +52,6 @@ int main(int argc, char* argv[]) {
     int *A_raw = NULL; // full matrix A (only on master, con padding)
     int *T_raw = NULL; // full matrix T (only on master, con padding)
 
-    /* Calcolo dei sendcounts e senddispls per Scatterv */
-    int *sendcounts = malloc(size * sizeof(int));
-    int *senddispls = malloc(size * sizeof(int));
-
     if (my_rank == 0) { /* MASTER */
         
         // allocates and initializes the full (padded) matrix A e T
@@ -77,53 +73,11 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-
-        /* Calcolo sendcounts e senddispls */
-        senddispls[0] = 0;
-        for (int p = 0; p < size; p++) {
-            int global_row_start = p * rows_per_proc;
-            int remaining_rows = n_size - global_row_start;
-            
-            int actual_rows;
-            if (remaining_rows <= 0) {
-                actual_rows = 0;
-            } else if (remaining_rows < rows_per_proc) {
-                actual_rows = remaining_rows;
-            } else {
-                actual_rows = rows_per_proc;
-            }
-            
-            sendcounts[p] = actual_rows * n_size;
-            if (p > 0) {
-                senddispls[p] = senddispls[p - 1] + sendcounts[p - 1];
-            }
-        }
     }
 
-    // Broadcast sendcounts and senddispls to all processes
-    MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(senddispls, size, MPI_INT, 0, MPI_COMM_WORLD);
-
-    int global_row_start = my_rank * rows_per_proc;
-    int remaining_rows = n_size - global_row_start;
-
-    int my_rows;
-    if (remaining_rows <= 0) {
-        my_rows = 0;
-    } else if (remaining_rows < rows_per_proc) {
-        my_rows = remaining_rows;
-    } else {
-        my_rows = rows_per_proc;
-    }
-
-    // local buffers: each process gets its chunk of A and T (only actual rows, no padding)
-    int *my_A = NULL;
-    int *my_T = NULL;
-    
-    if (my_rows > 0) {
-        my_A = malloc(my_rows * n_size * sizeof(int));
-        my_T = malloc(my_rows * n_size * sizeof(int));
-    }
+    // local buffers: each process gets its chunk of A and T
+    int *my_A = malloc(rows_per_proc * n_size * sizeof(int));
+    int *my_T = malloc(rows_per_proc * n_size * sizeof(int));
 
     /* timing start **************************************/
     double start, end, local_elaps, global_elaps;
@@ -132,22 +86,44 @@ int main(int argc, char* argv[]) {
     /* timing start **************************************/
 
     /* MASTER: DATA DISTRIBUTION */
-    MPI_Scatterv(
-        A_raw, sendcounts, senddispls, MPI_INT, // send buffers
-        my_A, (my_rows * n_size), MPI_INT,      // recv buffer
+    MPI_Scatter(
+        A_raw, rows_per_proc * n_size, MPI_INT, // send buffer
+        my_A, rows_per_proc * n_size, MPI_INT,  // recv buffer
         0, MPI_COMM_WORLD
     );
 
     /* 1) neighbor ranks */
     int up   = (my_rank > 0)        ? my_rank - 1 : MPI_PROC_NULL;
     int down = (my_rank < size - 1) ? my_rank + 1 : MPI_PROC_NULL;
-    int total_rows = my_rows + 2; // two ghost rows (above and below)
+    int total_rows = rows_per_proc + 2; // two ghost rows (above and below)
 
+    // ------------------------------------------------------------------------------------- ??
     /* Calcolo dell'indice globale della prima riga assegnata a questo processo */
-    // (già calcolato sopra: global_row_start)
+    int global_row_start = my_rank * rows_per_proc;
 
-    /* Numero di righe effettivamente valide per questo processo */
-    // (già calcolato sopra: my_rows)
+    /* Numero di righe ancora disponibili nella matrice globale
+    a partire da global_row_start */
+    int remaining_rows = n_size - global_row_start;
+
+    /* Numero di righe effettivamente valide per questo processo
+    (le eventuali righe in eccesso sono padding) */
+    int my_rows;
+
+    if (remaining_rows <= 0) {
+        /* Questo processo non riceve alcuna riga reale:
+        tutto il suo blocco è padding */
+        my_rows = 0;
+    }
+    else if (remaining_rows < rows_per_proc) {
+        /* Questo processo riceve solo una parte del blocco:
+        le prime 'remaining_rows' righe sono valide,
+        le restanti sono padding */
+        my_rows = remaining_rows;
+    }
+    else {
+        /* Questo processo riceve un blocco completo di righe valide */
+        my_rows = rows_per_proc;
+    }
 
     /* Calcolo dell'ultimo processo che contiene almeno una riga reale.
     Serve per gestire correttamente i bordi inferiori della matrice
@@ -163,17 +139,16 @@ int main(int argc, char* argv[]) {
         /* Caso limite: matrice vuota */
         last_rank_with_data = -1;
     }
+    // ------------------------------------------------------------------------------------- ??
 
     /* 2) add ghost rows above and below */
     int *my_A_plus_ghosts = malloc(total_rows * n_size * sizeof(int));
-    int *upper_ghost = my_A_plus_ghosts;                          // row -1
-    int *local_data  = my_A_plus_ghosts + n_size;                 // rows [0 ... my_rows-1]
-    int *lower_ghost = my_A_plus_ghosts + (my_rows + 1) * n_size; // row + my_rows
+    int *upper_ghost = my_A_plus_ghosts;                                // row -1
+    int *local_data  = my_A_plus_ghosts + n_size;                       // rows [0 ... rows_per_proc-1] (include padding)
+    int *lower_ghost = my_A_plus_ghosts + (rows_per_proc + 1) * n_size; // row + rows_per_proc
 
     /* copy local block into the central part of the buffer */
-    if (my_rows > 0) {
-        memcpy(local_data, my_A, my_rows * n_size * sizeof(int));
-    }
+    memcpy(local_data, my_A, rows_per_proc * n_size * sizeof(int)); // (fix: rimosso '+' errato)
 
     /* 2) Halo exchange rows */
     // SSend / Recv version ********************************************************************
@@ -188,18 +163,54 @@ int main(int argc, char* argv[]) {
         MPI_Ssend(local_data + send_down_offset, n_size, MPI_INT, down, 200, MPI_COMM_WORLD);
     }
 
+    /*
+    if (my_rank % 2 == 0) {
+        // I rank pari inviano prima
+        if (down != MPI_PROC_NULL) MPI_Ssend(local_data + send_down_idx, n_size, MPI_INT, down, 100, MPI_COMM_WORLD);
+        if (up != MPI_PROC_NULL)   MPI_Recv(upper_ghost, n_size, MPI_INT, up, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else {
+        // I rank dispari ricevono prima
+        if (up != MPI_PROC_NULL)   MPI_Recv(upper_ghost, n_size, MPI_INT, up, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        if (down != MPI_PROC_NULL) MPI_Ssend(local_data + send_down_idx, n_size, MPI_INT, down, 100, MPI_COMM_WORLD);
+    }
+
+    // --- FASE 2: Invio verso l'alto, ricezione dal basso ---
+    if (my_rank % 2 == 0) {
+        if (up != MPI_PROC_NULL)   MPI_Ssend(local_data, n_size, MPI_INT, up, 200, MPI_COMM_WORLD);
+        if (down != MPI_PROC_NULL) MPI_Recv(lower_ghost, n_size, MPI_INT, down, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else {
+        if (down != MPI_PROC_NULL) MPI_Recv(lower_ghost, n_size, MPI_INT, down, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        if (up != MPI_PROC_NULL)   MPI_Ssend(local_data, n_size, MPI_INT, up, 200, MPI_COMM_WORLD);
+    }
+    */
+
+    // SendRecv version ********************************************************************
+    /*
+    // 2.1) Simultaneous send/recv to/from 'up' and 'down'
+    MPI_Sendrecv(
+        local_data, n_size, MPI_INT, up, 0 ,
+        lower_ghost, n_size, MPI_INT, down, 0,
+        MPI_COMM_WORLD, MPI_STATUS_IGNORE
+    );
+    MPI_Sendrecv(
+        local_data + (rows_per_proc - 1) * n_size, n_size, MPI_INT, down, 1,
+        upper_ghost, n_size, MPI_INT, up, 1,
+        MPI_COMM_WORLD, MPI_STATUS_IGNORE
+    );
+    */
+
     /* 3. Parallel processing (each process on its local domain) */
     for (int i = 0; i < my_rows; i++) { // handles only valid rows
         for (int j = 0; j < n_size; j++) {
 
             // initialize accumulators
-            int sum = 0; // sum of the neighborhood values
+            float sum = 0.0f; // sum of the neighborhood values
             int count = 0;    // number of elements, for the mean
 
             // Rows index mapping nel buffer con ghost:
-            // - my_A_plus_ghosts[0]              | upper ghost row
-            // - my_A_plus_ghosts[1 ... my_rows]  | local rows
-            // - my_A_plus_ghosts[my_rows + 1]    | lower ghost row
+            // - my_A_plus_ghosts[0]                   | upper ghost row
+            // - my_A_plus_ghosts[1 ... rows_per_proc] | local rows (con padding in coda)
+            // - my_A_plus_ghosts[rows_per_proc + 1]   | lower ghost row
 
             /* 3.1 neighborhood  bounds */
             // vertical 
@@ -230,9 +241,9 @@ int main(int argc, char* argv[]) {
     free(my_A_plus_ghosts);
 
     /* MASTER: DATA GATHERING */
-    MPI_Gatherv(
-        my_T, (my_rows * n_size), MPI_INT,      // send buffer
-        T_raw, sendcounts, senddispls, MPI_INT, // recv buffers
+    MPI_Gather(
+        my_T, rows_per_proc * n_size, MPI_INT,  // send buffer (include padding)
+        T_raw, rows_per_proc * n_size, MPI_INT, // recv buffer (size * rows_per_proc righe)
         0, MPI_COMM_WORLD
     );
 
@@ -241,11 +252,18 @@ int main(int argc, char* argv[]) {
     local_elaps = end - start;
     /* timing end **************************************/
 
+    /*
+    if (benchmark) {
+        printf("%d,%f\n", my_rank, local_elaps);
+    }
+    */
+
     MPI_Reduce(&local_elaps, &global_elaps, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (my_rank == 0) {
         if (benchmark) {
             printf("%d,%d,%f\n", size, n_size, global_elaps);
+            //printf("MAX,%f\n", global_elaps);
         } else if (!quiet) {
             // Stampa solo le prime n_size righe (ignora il padding)
             for (int i = 0; i < n_size; i++) {
@@ -259,12 +277,8 @@ int main(int argc, char* argv[]) {
         free(T_raw);
     }
 
-    if (my_rows > 0) {
-        free(my_A);
-        free(my_T);
-    }
-    free(sendcounts);
-    free(senddispls);
+    free(my_A);
+    free(my_T);
     MPI_Finalize();
 
     return EXIT_SUCCESS;
