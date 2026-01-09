@@ -1,4 +1,7 @@
 #!/bin/bash
+
+$SEED=1234
+
 #SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:10:00
@@ -14,5 +17,5 @@
 
 # --- TEST MPI ---
 for I in 1080 2160 4320; do
-  srun ./bin/binarize_mpi $I
+  srun ./bin/binarize_mpi $I $SEED
 done

@@ -252,15 +252,18 @@ int main(int argc, char* argv[]) {
     local_elaps = end - start;
     /* timing end **************************************/
 
+    /*
     if (benchmark) {
         printf("%d,%f\n", my_rank, local_elaps);
     }
+    */
 
     MPI_Reduce(&local_elaps, &global_elaps, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (my_rank == 0) {
         if (benchmark) {
-            printf("MAX,%f\n", global_elaps);
+            printf("%d,%d,%f\n", size, n_size, global_elaps);
+            //printf("MAX,%f\n", global_elaps);
         } else if (!quiet) {
             // Stampa solo le prime n_size righe (ignora il padding)
             for (int i = 0; i < n_size; i++) {
