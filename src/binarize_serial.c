@@ -11,7 +11,7 @@ int main( int argc, char* argv[] ) {
     // args parsing
     int n_size = N;
     int quiet = 0;
-    unsigned int seed = (unsigned int)time(NULL); // default: TIME
+    unsigned int seed = (unsigned int)time(NULL);
 
     int pos = 0; // 0 = size, 1 = seed
     for (int k = 1; k < argc; k++) {
@@ -23,11 +23,13 @@ int main( int argc, char* argv[] ) {
         }
         char *end = NULL;
         long val = strtol(argv[k], &end, 10);
-        if (*end != '\0') continue; // not a valid number, skip
+        if (*end != '\0') continue; 
 
-        if (pos == 0) { // matrix size
-            if (val > 0) n_size = (int)val;
-        } else if (pos == 1) { // seed
+        if (pos == 0) { // first: MATRIX SIZE
+            if (val > 0) 
+                n_size = (int)val;
+        } 
+        else if (pos == 1) { // second: SEED
             seed = (unsigned int)val;
         }
         pos++;
@@ -37,7 +39,6 @@ int main( int argc, char* argv[] ) {
     int *A_raw = malloc(n_size * n_size * sizeof(int));
     int *T_raw = malloc(n_size * n_size * sizeof(int));
     
-    // matrix as 2D arrays
     int (*A)[n_size] = (int (*)[n_size])A_raw; 
     int (*T)[n_size] = (int (*)[n_size])T_raw; 
 

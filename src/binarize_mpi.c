@@ -14,9 +14,11 @@ int main(int argc, char* argv[]) {
     int quiet = 0;
     int benchmark = 0;
     unsigned int seed = (unsigned int)time(NULL);
-
-    int pos = 0;
+ 
+    int pos = 0; // 0 = size, 1 = seed
     for (int k = 1; k < argc; k++) {
+
+        // if quiet flag, no output
         if (strcmp(argv[k], "--q") == 0) {
             quiet = 1;
             continue;
@@ -31,9 +33,9 @@ int main(int argc, char* argv[]) {
             continue;
         if (pos == 0) { // first: MATRIX SIZE
             if (val > 0) 
-            n_size = (int)val;  
+                n_size = (int)val;  
         }
-        else if (pos == 1) { // second: RANDOM SEED
+        else if (pos == 1) { // second: SEED
             seed = (unsigned int)val; 
         }
         pos++;
@@ -45,20 +47,23 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    // Numero di righe per processo con padding (ceil division)
+    // Number of rows per process (with ceiling)
     int rows_per_proc = (n_size + size - 1) / size;
-    int padded_rows_total = rows_per_proc * size; // righe totali con padding
+    int padded_rows_total = rows_per_proc * size; // total rows with padding
 
-    int *A_raw = NULL; // full matrix A (only on master, con padding)
-    int *T_raw = NULL; // full matrix T (only on master, con padding)
+    int *A_raw = NULL; // full matrix A (only on master, with padding)
+    int *T_raw = NULL; // full matrix T (only on master, with padding)
 
-    /* Calcolo dei sendcounts e senddispls per Scatterv */
+    /* Data structures for Scatterv */
+    // it says me how many elements each process will receive
     int *sendcounts = malloc(size * sizeof(int));
+    
+    // it says me the displacement (in elements) from the beginning of A_raw for each process
     int *senddispls = malloc(size * sizeof(int));
 
     if (my_rank == 0) { /* MASTER */
         
-        // allocates and initializes the full (padded) matrix A e T
+        // allocates and initializes the full (padded) matrix A and T
         A_raw = malloc(padded_rows_total * n_size * sizeof(int));
         T_raw = malloc(padded_rows_total * n_size * sizeof(int));
         
@@ -78,24 +83,31 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        /* Calcolo sendcounts e senddispls */
-        senddispls[0] = 0;
+        /* Calculation of sendcounts and senddispls */
+        senddispls[0] = 0; // displacement of the first block is 0
+
         for (int p = 0; p < size; p++) {
+
+            // calculate the starting row index for process p
             int global_row_start = p * rows_per_proc;
-            int remaining_rows = n_size - global_row_start;
+            int remaining_rows = n_size - global_row_start; // there may not be  
+                                                            // enough "real" rows left
             
             int actual_rows;
-            if (remaining_rows <= 0) {
+            if (remaining_rows <= 0) { // no more real rows
                 actual_rows = 0;
-            } else if (remaining_rows < rows_per_proc) {
+
+            } else if (remaining_rows < rows_per_proc) { // last process with partial rows
                 actual_rows = remaining_rows;
-            } else {
+            
+            } else { // send the full block
                 actual_rows = rows_per_proc;
             }
             
-            sendcounts[p] = actual_rows * n_size;
+            sendcounts[p] = actual_rows * n_size; // actual_rows is the number of rows assigned to process p
+                                                  // multiplied by n_size to get number of elements
             if (p > 0) {
-                senddispls[p] = senddispls[p - 1] + sendcounts[p - 1];
+                senddispls[p] = senddispls[p - 1] + sendcounts[p - 1]; // displacement is cumulative
             }
         }
     }
@@ -247,7 +259,6 @@ int main(int argc, char* argv[]) {
         if (benchmark) {
             printf("%d,%d,%f\n", size, n_size, global_elaps);
         } else if (!quiet) {
-            // Stampa solo le prime n_size righe (ignora il padding)
             for (int i = 0; i < n_size; i++) {
                 for (int j = 0; j < n_size ; j++) {
                     printf("%d ", T_raw[i * n_size + j]);
@@ -263,8 +274,10 @@ int main(int argc, char* argv[]) {
         free(my_A);
         free(my_T);
     }
+
     free(sendcounts);
     free(senddispls);
+    
     MPI_Finalize();
 
     return EXIT_SUCCESS;
