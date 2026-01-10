@@ -14,7 +14,7 @@ echo "P,N,Time" > weak_mpi_results.csv
 # P: numero di task
 # N: calcolato come N_base * sqrt(P) per mantenere N^2/P costante
 TASKS=(1     2     4     8     12    16    24)
-SIZES=(10000 14142 20000 28284 34641 40000 48989)
+SIZES=(2000 2828 4000 5656 6928 8000 9798)
 
 for i in "${!TASKS[@]}"; do
     P=${TASKS[$i]}
