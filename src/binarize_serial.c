@@ -43,7 +43,7 @@ int main( int argc, char* argv[] ) {
     int (*T)[n_size] = (int (*)[n_size])T_raw; 
 
     int i, j, count;
-    float sum, mij;
+    float sum;
 
     // initialize random seed
     srand(seed);

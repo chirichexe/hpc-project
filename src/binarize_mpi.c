@@ -144,18 +144,21 @@ int main(int argc, char* argv[]) {
 
     /* 2) Halo exchange rows */
     // SSend / Recv version ********************************************************************
-    if (my_rank > 0 && my_rows > 0) {
-        MPI_Ssend(local_data, n_size, MPI_UINT8_T, up, 100, MPI_COMM_WORLD);
-        MPI_Recv(upper_ghost, n_size, MPI_UINT8_T, up, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-    int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
 
-    if (my_rank < size - 1 && my_rows > 0) {
-        if (sendcounts[down] > 0) {
-            MPI_Recv(lower_ghost, n_size, MPI_UINT8_T, down, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Ssend(local_data + send_down_offset, n_size, MPI_UINT8_T, down, 200, MPI_COMM_WORLD);
-        }
+    /* 2) Halo exchange rows using Sendrecv to avoid deadlocks and synchronization overhead */
+    if (my_rows > 0) {
+        // Exchange with UP: send my first row, receive into upper_ghost
+        MPI_Sendrecv(local_data, n_size, MPI_UINT8_T, up, 100,
+                     upper_ghost, n_size, MPI_UINT8_T, up, 200,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        // Exchange with DOWN: send my last row, receive into lower_ghost
+        int send_down_offset = (my_rows - 1) * n_size;
+        MPI_Sendrecv(local_data + send_down_offset, n_size, MPI_UINT8_T, down, 200,
+                     lower_ghost, n_size, MPI_UINT8_T, down, 100,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
+
 
     /* 3. Parallel processing (each process on its local domain) */
     for (int i = 0; i < my_rows; i++) { // handles only valid rows
