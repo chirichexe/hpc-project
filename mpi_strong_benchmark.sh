@@ -8,13 +8,16 @@
 
 EXEC="./bin/binarize_mpi"
 SEED=1234
-N_FIXED=2000 # strong scaling = same problem size
+N_FIXED=2000
+RESULTS_DIR="results"
 
-echo "P,N,Time" > strong_mpi_results.csv
+mkdir -p $RESULTS_DIR
 
-# P = threads
+echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results.csv
+
 for P in 1 2 4 8 12 16 20 24; do
-    # -b (benchmark)
-    # --q (quiet)
-    srun -n $P $EXEC $N_FIXED $SEED -b --q >> strong_mpi_results.csv
+    for i in {1..10}; do
+        RESULT=$(srun -n $P $EXEC $N_FIXED $SEED -b --q)
+        echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results.csv
+    done
 done

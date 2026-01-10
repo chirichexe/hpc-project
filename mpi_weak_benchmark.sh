@@ -8,16 +8,20 @@
 
 EXEC="./bin/binarize_mpi"
 SEED=1234
+RESULTS_DIR="results"
 
-echo "P,N,Time" > weak_mpi_results.csv
+mkdir -p $RESULTS_DIR
 
-# P: numero di task
-# N: calcolato come N_base * sqrt(P) per mantenere N^2/P costante
 TASKS=(1     2     4     8     12    16    24)
 SIZES=(2000 2828 4000 5656 6928 8000 9798)
+
+echo "Run,P,N,Time" > $RESULTS_DIR/weak_mpi_results.csv
 
 for i in "${!TASKS[@]}"; do
     P=${TASKS[$i]}
     N=${SIZES[$i]}
-    srun -n $P $EXEC $N $SEED -b --q >> weak_mpi_results.csv
+    for run in {1..10}; do
+        RESULT=$(srun -n $P $EXEC $N $SEED -b --q)
+        echo "$run,$RESULT" >> $RESULTS_DIR/weak_mpi_results.csv
+    done
 done
