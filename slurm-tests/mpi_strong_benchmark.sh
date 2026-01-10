@@ -6,7 +6,7 @@
 #SBATCH --ntasks=24
 #SBATCH -o strong_scaling.out
 
-EXEC="./bin/binarize_mpi"
+EXEC="../bin/binarize_mpi"
 SEED=1234
 N_FIXED=2000
 RESULTS_DIR="results"

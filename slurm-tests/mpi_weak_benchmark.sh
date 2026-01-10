@@ -6,7 +6,7 @@
 #SBATCH --ntasks=24
 #SBATCH -o weak_scaling.out
 
-EXEC="./bin/binarize_mpi"
+EXEC="../bin/binarize_mpi"
 SEED=1234
 RESULTS_DIR="results"
 
