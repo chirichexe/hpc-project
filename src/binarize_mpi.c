@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
         memcpy(local_data, my_A, my_rows * n_size * sizeof(int));
     }
 
-    /* 2) Halo exchange rows */
+    /* 2) Halo exchange rows 
     // SSend / Recv version ********************************************************************
     if (my_rank > 0 && my_rows > 0) {
         MPI_Ssend(local_data, n_size, MPI_INT, up, 100, MPI_COMM_WORLD);
@@ -155,6 +155,32 @@ int main(int argc, char* argv[]) {
             MPI_Recv(lower_ghost, n_size, MPI_INT, down, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             MPI_Ssend(local_data + send_down_offset, n_size, MPI_INT, down, 200, MPI_COMM_WORLD);
         }
+    }*/
+
+    /* 2) Halo exchange rows (ASYNCHRONOUS version) */
+    MPI_Request requests[4];
+    int req_count = 0;
+    int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
+
+    // Prepariamo le ricezioni (Irecv)
+    if (my_rank > 0 && my_rows > 0) {
+        MPI_Irecv(upper_ghost, n_size, MPI_INT, up, 200, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+    if (my_rank < size - 1 && my_rows > 0 && sendcounts[down] > 0) {
+        MPI_Irecv(lower_ghost, n_size, MPI_INT, down, 100, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+
+    // Prepariamo gli invii (Isend)
+    if (my_rank > 0 && my_rows > 0) {
+        MPI_Isend(local_data, n_size, MPI_INT, up, 100, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+    if (my_rank < size - 1 && my_rows > 0 && sendcounts[down] > 0) {
+        MPI_Isend(local_data + send_down_offset, n_size, MPI_INT, down, 200, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+
+    // Attendiamo che tutti gli scambi siano completati prima di procedere al calcolo
+    if (req_count > 0) {
+        MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
     }
 
     /* 3. Parallel processing (each process on its local domain) */
