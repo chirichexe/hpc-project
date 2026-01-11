@@ -20,11 +20,11 @@ def process_scaling(strong_csv, weak_csv):
         s1 = stats[stats['P'] == 1]['std'].iloc[0]
         
         if is_weak:
-            stats['speedup'] = stats['P'] * (t1 / stats['mean'])
+            stats['speedup'] = stats['P'] * (t1 / stats['mean']) # DA CAPIRE
             title_suffix = "Weak Scaling (Gustafson)"
             color = "green"
         else:
-            stats['speedup'] = t1 / stats['mean']
+            stats['speedup'] = t1 / stats['mean'] # CORRETTA
             title_suffix = "Strong Scaling"
             color = "orange"
 

@@ -51,8 +51,11 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    // Number of rows per process (simplified distribution)
+    /* Data distribution */
+    // the minimum number of rows assigned to each process
     int base_rows = n_size / size;
+
+    // extra rows to distribute among the first 'extra_rows' processes
     int extra_rows = n_size % size;
 
     int *A_raw = NULL; // matrix A (only on master)
@@ -146,14 +149,16 @@ int main(int argc, char* argv[]) {
     }
 
     /* 2) Halo exchange rows */
+    // if i have no rows (my_rows==0), no data to send else, the 
+    // offset of the last row to send is the last row of my local data
+    int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
+
     if (exchange_mode == 0) {
         // SSend / Recv version ********************************************************************
         if (my_rank > 0 && my_rows > 0) {
             MPI_Ssend(local_data, n_size, MPI_INT, up, 100, MPI_COMM_WORLD);
             MPI_Recv(upper_ghost, n_size, MPI_INT, up, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
-        
-        int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
     
         if (my_rank < size - 1 && my_rows > 0) {
             if (sendcounts[down] > 0) {
@@ -165,9 +170,8 @@ int main(int argc, char* argv[]) {
         // Isend / Irecv version ******************************************************************** 
         MPI_Request requests[4];
         int req_count = 0;
-        int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
     
-        // receive first, then send (Irecv + Isend)
+        // receive first
         if (my_rank > 0 && my_rows > 0) {
             MPI_Irecv(upper_ghost, n_size, MPI_INT, up, 200, MPI_COMM_WORLD, &requests[req_count++]);
         }
@@ -189,8 +193,6 @@ int main(int argc, char* argv[]) {
         }
     } else if (exchange_mode == 2) {
         // Sendrecv version ********************************************************************
-        int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
-        
         // Exchange from UP: send my first row, receive the row above me
         MPI_Sendrecv(local_data, n_size, MPI_INT, up, 100,
                     upper_ghost, n_size, MPI_INT, up, 200,
