@@ -6,6 +6,12 @@
 #SBATCH --ntasks=24
 #SBATCH -o strong_scaling.out
 
+EXCHANGE_MODE=$1
+
+if [ -z "$EXCHANGE_MODE" ]; then
+    EXCHANGE_MODE=0
+fi
+
 EXEC="../bin/binarize_mpi"
 SEED=1234
 N_FIXED=2000
@@ -17,7 +23,7 @@ echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results.csv
 
 for P in 1 2 4 8 12 16 20 24; do
     for i in {1..10}; do
-        RESULT=$(srun -n $P $EXEC $N_FIXED $SEED -b --q)
+        RESULT=$(srun -n $P $EXEC $N_FIXED $SEED $EXCHANGE_MODE -b --q)
         echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results.csv
     done
 done
