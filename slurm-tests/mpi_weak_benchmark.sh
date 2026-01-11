@@ -17,8 +17,8 @@ RESULTS_DIR="results"
 
 mkdir -p $RESULTS_DIR
 
-TASKS=(1     2     4     8     12    16    24)
-SIZES=(2000 2828 4000 5656 6928 8000 9798)
+TASKS=(1     2     4     8     12    16    20   24)
+SIZES=(2000 2828 4000 5656 6928 8000 8944 9798)
 
 echo "Run,P,N,Time" > $RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv
 
