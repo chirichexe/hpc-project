@@ -12,10 +12,10 @@ if [ -z "$EXCHANGE_MODE" ]; then
     EXCHANGE_MODE=0
 fi
 
-EXEC="../bin/binarize_mpi"
+EXEC="./bin/binarize_mpi"
 SEED=1234
 N_FIXED=10000
-RESULTS_DIR="../results"
+RESULTS_DIR="./results"
 
 mkdir -p $RESULTS_DIR
 
