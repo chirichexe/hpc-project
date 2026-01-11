@@ -1,4 +1,6 @@
 #import "@preview/diatypst:0.8.0": *
+#let mpi_weak = csv("csv/strong_mpi.csv")
+#let mpi_strong = csv("csv/weak_mpi.csv")
 
 #show: slides.with(
   title: "Binarizzazione di una matrice", 
@@ -34,7 +36,7 @@ Lo scopo è quello di trasformare una matrice quadrata di numeri reali in una ma
 
     align(horizon)[
       #align(center)[
-        #image("hpc-proj-intorno.drawio.png", width: 70%)
+        #image("drawings/hpc-proj-intorno.drawio.png", width: 70%)
     ]
   ]
 )
@@ -53,7 +55,7 @@ Il valore di ogni elemento $t_(i,j)$ della matrice risultante $T$ viene determin
   - Data la dimensione $N >= 2000$, l'algoritmo deve processare almeno $4 times 10^6$ elementi, rendendo l'ottimizzazione o la parallelizzazione rilevante.
 
 = Implementazione Seriale
-== Implementazione Seriale
+== Considerazioni generali
 L'algoritmo seriale analizza ogni cella $A(i, j)$, calcola la media dei vicini (inclusa la cella stessa) e assegna un valore binario basato sul confronto tra il valore centrale e la media locale.
 
 ```c
@@ -90,9 +92,9 @@ Si noti la presenza di due leggere ottimizzazioni:
 
 2. Uso della formula ($A[i][j] * "count" > "sum"$) al posto della divisione ($"sum""/""count"$)
 
-= Implementazione Parallela
 
-== Implementazione Parallela: MPI
+= Implementazione Parallela: MPI
+== Considerazioni generali
 
 
 Essendo la matrice "distribuita" tra processi differenti, un processo necessita di dati appartenenti alla memoria di un altro per calcolare i valori sui bordi del proprio intorno.
@@ -168,7 +170,7 @@ Per inviare  blocchi di dimensione variabile (primitiva `MPI_Scatterv`), vengono
       *1. MPI_Bcast* \
       Il master comunica a tutti quanto dovranno allocare (`sendcounts` e `senddispls`).
       #v(5pt)
-      #image("hpc-proj-bcast.drawio.png", width: 67%)
+      #image("drawings/hpc-proj-bcast.drawio.png", width: 67%)
     ]
   ],
   
@@ -177,7 +179,7 @@ Per inviare  blocchi di dimensione variabile (primitiva `MPI_Scatterv`), vengono
       *2. MPI_Scatterv* \
       Il master, dopo l'allocazione della matrice, invia i segmenti di dati reali alle memorie locali dei processi.
       #v(5pt)
-      #image("hpc-proj-scatterv.drawio.png", width: 90%)
+      #image("drawings/hpc-proj-scatterv.drawio.png", width: 90%)
     ]
   ]
 )
@@ -189,7 +191,7 @@ Ogni processo alloca la porzione di righe indicata  dal master (`my_rows = sendc
 - *Lower Ghost Row:* Riceve la prima riga del processo successivo ($P_(k+1)$) se esiste.
 
 #align(center)[
-  #image("hpc-proj-matrix-scatter.drawio.png", width:72%)
+  #image("drawings/hpc-proj-matrix-scatter.drawio.png", width:72%)
 ]
 
 
@@ -209,7 +211,7 @@ Successivamente, copia i dati della propria porzione della matrice all'interno d
   gutter: 1em,
   
   align(center + horizon)[
-     #image("hpc-proj-A_plus_ghosts.drawio.png")
+     #image("drawings/hpc-proj-A_plus_ghosts.drawio.png")
   ],
   
   align(horizon)[
@@ -246,7 +248,7 @@ if (my_rank > 0 && my_rows > 0) {
 }
     ```
   ],
-  [ #image("hpc-proj-ssend-recv-2.drawio.png", width: 100%)]
+  [ #image("drawings/hpc-proj-ssend-recv-2.drawio.png", width: 100%)]
 )
 
 Successivamente, si calcola l'indice di memoria dove inizia l'ultima riga locale per l'invio al processo sottostante:
@@ -272,7 +274,7 @@ L'invio tramite `Ssend` sincronizza i processi: una volta completata la trasmiss
     }
     ```
   ],
-  [ #image("hpc-proj-ssend-recv-1.drawio.png", width: 70%)]
+  [ #image("drawings/hpc-proj-ssend-recv-1.drawio.png", width: 70%)]
 )
 
 == Calcolo elementi dell'intorno e sogliatura
@@ -326,7 +328,7 @@ for (int dz = zmin; dz <= zmax; dz++) {
   ```
   ],
   align(horizon)[
-     #image("hpc-proj-matrix-for-cycle.drawio.png")
+     #image("drawings/hpc-proj-matrix-for-cycle.drawio.png")
   ]
 )
 
@@ -353,11 +355,30 @@ if (my_rows > 0)
 free(sendcounts); free(senddispls);
 ```
 
-== Versione Parallela: OpenMP
-not yet..
-= Benchmark
+= Implementazione Parallela: OpenMP
+== Considerazioni generali
 
+= Benchmark
 == MPI
+== Tabella Strong Scaling
+//#generate-scaling-table(mpi_strong, is-weak: false)
+#mpi_table(mpi_strong, mode: "strong")
+
+
+== Tabella Weak Scaling (Gustafson)
+#mpi_table(mpi_weak, mode: "weak", r: 0.9)
+//#generate-scaling-table(mpi_weak, is-weak: true)
+
+#align(center)[
+
+#image("plot/mpi_strong_comparison.png")
+]
+
+#align(center)[
+
+#image("plot/mpi_weak_comparison.png")
+]
+
 == OpenMP
 
 = Conclusioni
