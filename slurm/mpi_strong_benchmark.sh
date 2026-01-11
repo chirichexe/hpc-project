@@ -14,8 +14,8 @@ fi
 
 EXEC="../bin/binarize_mpi"
 SEED=1234
-N_FIXED=2000
-RESULTS_DIR="results"
+N_FIXED=10000
+RESULTS_DIR="../results"
 
 mkdir -p $RESULTS_DIR
 
