@@ -4,7 +4,7 @@
 #include <time.h>
 #include <string.h>
 
-#define N 2000 
+#define N 2000 /* standard matrix size */
 
 int main(int argc, char* argv[]) {
 
@@ -16,11 +16,16 @@ int main(int argc, char* argv[]) {
     int exchange_mode = 0; // 0 = ssend/recv, 1 = isend/irecv, 2 = sendrecv
     unsigned int seed = (unsigned int)time(NULL);
  
+    if (argc > 6) {
+        printf("Usage: %s [matriz_size] [seed] [exchange_mode] [-q|--quiet] [-b|--benchmark]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
     int pos = 0; // 0 = size, 1 = seed, 2 =  exchange mode
     for (int k = 1; k < argc; k++) {
 
         // if quiet flag, no output
-        if (strcmp(argv[k], "--q") == 0) {
+        if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
             quiet = 1;
             continue;
         }

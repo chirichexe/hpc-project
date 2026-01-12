@@ -13,11 +13,16 @@ int main( int argc, char* argv[] ) {
     int quiet = 0;
     unsigned int seed = (unsigned int)time(NULL);
 
+    if (argc > 4) {
+        fprintf(stderr, "Usage: %s [matrix_size] [seed] [-q|--quiet]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
     int pos = 0; // 0 = size, 1 = seed
     for (int k = 1; k < argc; k++) {
 
         // if quiet flag, no output
-        if (strcmp(argv[k], "--q") == 0) {
+        if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
             quiet = 1;
             continue;
         }
@@ -61,7 +66,7 @@ int main( int argc, char* argv[] ) {
         }
     }
 
-    /* 2. Serial processing */
+    /* 2. binarization processing (serial) */
     for (i = 0; i < n_size; i++) {
         for (j = 0; j < n_size; j++) {
 
@@ -86,6 +91,7 @@ int main( int argc, char* argv[] ) {
         }
     }
 
+    /* 3. matrix print if not in quiet mode */
     if (!quiet) {
         for (i = 0; i < n_size; i++) {
             for (j = 0; j < n_size; j++) {

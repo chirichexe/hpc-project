@@ -14,7 +14,7 @@ fi
 
 EXEC="./bin/binarize_mpi"
 SEED=1234
-N_FIXED=10000
+N=10000
 RESULTS_DIR="./results"
 
 mkdir -p $RESULTS_DIR
@@ -23,7 +23,7 @@ echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
 
 for P in 1 2 4 8 12 16 20 24 48; do
     for i in {1..3}; do
-        RESULT=$(srun -n $P $EXEC $N_FIXED $SEED $EXCHANGE_MODE -b --q)
+        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b --q)
         echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
     done
 done
