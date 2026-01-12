@@ -16,7 +16,7 @@ mkdir -p $RESULTS_DIR
 THREADS=(1     2     4     8     12    16    20    24    48)
 SIZES=(5000 7071 10000 14142 17320 20000 22360 24494 34641)
 
-echo "Run,Threads,N,Time" > $RESULTS_DIR/weak_omp_results.csv
+echo "Run,P,N,Time" > $RESULTS_DIR/weak_omp_results.csv
 
 for i in "${!THREADS[@]}"; do
     T=${THREADS[$i]}

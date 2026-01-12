@@ -13,7 +13,7 @@ RESULTS_DIR="./results"
 
 mkdir -p $RESULTS_DIR
 
-echo "Run,Threads,N,Time" > $RESULTS_DIR/strong_omp_results.csv
+echo "Run,P,N,Time" > $RESULTS_DIR/strong_omp_results.csv
 
 # Ciclo sul numero di thread
 for T in 1 2 4 8 12 16 20 24 48; do
