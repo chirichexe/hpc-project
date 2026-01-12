@@ -2,8 +2,8 @@
 #SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:20:00
-#SBATCH --nodes=1
-#SBATCH --ntasks=24
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=48
 #SBATCH -o strong_scaling.out
 
 EXCHANGE_MODE=$1

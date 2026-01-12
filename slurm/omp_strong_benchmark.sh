@@ -2,9 +2,8 @@
 #SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:20:00
-#SBATCH --nodes=1
-#SBATCH --cpus-per-task=48
-#SBATCH --ntasks=1
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=48
 #SBATCH -o strong_scaling_omp.out
 
 EXEC="./bin/binarize_omp"
