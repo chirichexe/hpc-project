@@ -24,7 +24,7 @@ echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
 # Ciclo sul numero di processi
 for P in 1 2 4 8 12 16 20 24 48 ; do
     for i in {1..3}; do
-        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
+        RESULT=$(srun -n $P -N 1-2 $EXEC $N $SEED $EXCHANGE_MODE -b -q)
         echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
     done
 done
