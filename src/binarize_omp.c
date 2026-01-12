@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* 2. binarization processing (OpenMP) */
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for num_threads(size) schedule(static) 
     for (int i = 0; i < n_size; i++) {
         for (int j = 0; j < n_size; j++) {
 
