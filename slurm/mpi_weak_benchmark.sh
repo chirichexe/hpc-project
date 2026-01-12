@@ -2,8 +2,8 @@
 #SBATCH --account=tra25_Inginfbo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:20:00
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=48
+#SBATCH --nodes=1
+#SBATCH --ntasks=48
 #SBATCH -o weak_scaling_mpi.out
 
 EXCHANGE_MODE=$1
@@ -27,7 +27,7 @@ for i in "${!TASKS[@]}"; do
     N=${SIZES[$i]}
     
     for run in {1..3}; do
-        RESULT=$(srun -n $P -N 1-2 $EXEC $N $SEED $EXCHANGE_MODE -b -q)
+        RESULT=$(srun $EXEC $N $SEED $EXCHANGE_MODE -b -q)
         echo "$run,$RESULT" >> $RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv
     done
 done

@@ -2,9 +2,9 @@
 #SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:20:00
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=48
-#SBATCH -o strong_scaling_mpi.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=48
+#SBATCH -o strong_scaling.out
 
 EXCHANGE_MODE=$1
 
@@ -24,7 +24,7 @@ echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
 # Ciclo sul numero di processi
 for P in 1 2 4 8 12 16 20 24 48 ; do
     for i in {1..3}; do
-        RESULT=$(srun -n $P -N 1-2 $EXEC $N $SEED $EXCHANGE_MODE -b -q)
+        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
         echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
     done
 done
