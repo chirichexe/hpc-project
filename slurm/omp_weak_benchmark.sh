@@ -3,8 +3,7 @@
 #SBATCH --partition=g100_usr_prod
 #SBATCH -t 00:20:00
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=48
-#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=48
 #SBATCH -o weak_scaling_omp.out
 
 EXEC="./bin/binarize_omp"
@@ -25,7 +24,6 @@ for i in "${!THREADS[@]}"; do
     export OMP_NUM_THREADS=$T
     
     for run in {1..3}; do
-        # Esecuzione: passiamo T come primo argomento
         RESULT=$($EXEC $T $N $SEED -b -q)
         echo "$run,$RESULT" >> $RESULTS_DIR/weak_omp_results.csv
     done
