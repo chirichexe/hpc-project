@@ -4,6 +4,7 @@
 #SBATCH -t 00:20:00
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=48
+#SBATCH --exclusive
 #SBATCH -o weak_scaling.out
 
 EXCHANGE_MODE=$1
@@ -17,8 +18,8 @@ RESULTS_DIR="./results"
 
 mkdir -p $RESULTS_DIR
 
-TASKS=(1     2     4     8     12    16    20   24 48)
-SIZES=(5000 7071 10000 14142 17320 20000 22360 24494 34641)
+TASKS=(1 2 4 8 16 32 48 64 96)
+SIZES=(10000 14142 20000 28284 40000 56568 69282 80000 97979)
 
 echo "Run,P,N,Time" > $RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv
 
@@ -26,7 +27,7 @@ for i in "${!TASKS[@]}"; do
     P=${TASKS[$i]}
     N=${SIZES[$i]}
     for run in {1..3}; do
-        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b --q)
+        RESULT=$(srun -n $P --exact $EXEC $N $SEED $EXCHANGE_MODE -b -q)
         echo "$run,$RESULT" >> $RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv
     done
 done
