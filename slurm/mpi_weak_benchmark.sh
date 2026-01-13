@@ -27,7 +27,7 @@ for i in "${!TASKS[@]}"; do
     N=${SIZES[$i]}
     
     for run in {1..3}; do
-        RESULT=$(srun $EXEC $N $SEED $EXCHANGE_MODE -b -q)
+        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
         echo "$run,$RESULT" >> $RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv
     done
 done

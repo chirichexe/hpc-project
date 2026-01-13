@@ -1,14 +1,57 @@
 #import "@preview/diatypst:0.8.0": *
 #let mpi_weak = csv("csv/strong_mpi.csv")
 #let mpi_strong = csv("csv/weak_mpi.csv")
+#let omp_weak = csv("csv/strong_openmp.csv")
+#let omp_strong = csv("csv/weak_openmp.csv")
+
+#let scaling_table(data) = {
+  let fmt(val) = {
+    if type(val) == str {
+      let n = float(val)
+      str(calc.round(n, digits: 4))
+    } else {
+      str(calc.round(val, digits: 4))
+    }
+  }
+
+  align(center + horizon)[
+    #block(width: 95%)[
+      #set text(size: 1.1em)
+      #table(
+        columns: (1fr, 1fr, 1.5fr, 1.5fr, 1.2fr, 1.2fr),
+        inset: (x: 12pt, y: 5pt), 
+        align: center + horizon,
+        stroke: 0.5pt + gray.lighten(40%),
+        fill: (x, y) => 
+          if y == 0 { blue.darken(70%) }
+          else if calc.even(y) { gray.lighten(94%) } 
+          else { white },
+
+        [*#text(fill: white)[P]*], 
+        [*#text(fill: white)[N]*], 
+        [*#text(fill: white)[Tempo medio]*], 
+        [*#text(fill: white)[Dev. standard]*], 
+        [*#text(fill: white)[Speedup]*], 
+        [*#text(fill: white)[Efficiency]*],
+        
+        ..data.slice(1).map(row => (
+          row.at(0), 
+          row.at(1), 
+          fmt(row.at(2)), 
+          fmt(row.at(3)), 
+          fmt(row.at(4)), 
+          fmt(row.at(5))
+        )).flatten()
+      )
+    ]
+  ]
+}
 
 #show: slides.with(
   title: "Binarizzazione di una matrice", 
   subtitle: "Progetto - Sistemi Concorrenti e Paralleli M",
   date: "A.A. 2025-2026",
   authors: ("Davide Chirichella - 0001222371"),
-
-  // Optional Styling (for more and explanation of options take a look at the typst universe)
   ratio: 16/9,
   layout: "medium",
   title-color: blue.darken(70%),
@@ -54,12 +97,12 @@ Il valore di ogni elemento $t_(i,j)$ della matrice risultante $T$ viene determin
 
   - Data la dimensione $N >= 2000$, l'algoritmo deve processare almeno $4 times 10^6$ elementi, rendendo l'ottimizzazione o la parallelizzazione rilevante.
 
-= Implementazione Seriale
-== Considerazioni generali
+= Implementazione Seriale 
+== Algoritmo
 L'algoritmo seriale analizza ogni cella $A(i, j)$, calcola la media dei vicini (inclusa la cella stessa) e assegna un valore binario basato sul confronto tra il valore centrale e la media locale.
 
 ```c
-// Accesso alla matrice tramite puntatore a array
+// Allocazione matrici
 int (*A)[n_size] = (int (*)[n_size])A_raw; 
 int (*T)[n_size] = (int (*)[n_size])T_raw; 
 
@@ -68,7 +111,7 @@ for (int i = 0; i < n_size; i++) {
     for (int j = 0; j < n_size; j++) {
         sum = 0, count = 0;
 
-        // definizione dei confini (3x3 con "fallback" dei bordi)
+        // definizione dei confini per lo stencil 3x3
         int zmin = (i > 0) ? i - 1 : i;
         int zmax = (i < n_size - 1) ? i + 1 : i;
         int wmin = (j > 0) ? j - 1 : j;
@@ -87,10 +130,7 @@ for (int i = 0; i < n_size; i++) {
 }
 ```
 
-Si noti la presenza di due leggere ottimizzazioni:
-1. Gestione dei bordi tramite "Ghost Cells".
-
-2. Uso della formula ($A[i][j] * "count" > "sum"$) al posto della divisione ($"sum""/""count"$)
+Si noti la presenza di una leggera *ottimizzazione*, ovvero l'uso della formula ($A[i][j] * "count" > "sum"$) al posto della divisione ($"sum""/""count"$)
 
 
 = Implementazione Parallela: MPI
@@ -216,7 +256,7 @@ Successivamente, copia i dati della propria porzione della matrice all'interno d
   
   align(horizon)[
     ```c
-    int *my_A_plus_ghosts = calloc(total_rows * n_size, sizeof(int));
+    int *my_A_plus_ghosts = \calloc(total_rows * n_size, sizeof(int));
     
     // puntatori ad interi per le "sottoparti" di my_A
     int *upper_ghost = my_A_plus_ghosts;
@@ -233,7 +273,7 @@ Per consentire l'invio e la ricezione delle Ghost Rows, si utilizzano le primiti
 - La primitiva `MPI_Recv` è sempre bloccante.
 - La primitiva `MPI_Ssend` implementa una comunicazione sincrona di tipo *rendez-vous*.
 
-Successivamente, ogni processo (tranne il primo) invia la propria riga di bordo superiore al vicino `up` (in 
+Ogni processo (tranne il primo) invia la propria riga di bordo superiore al vicino `up` (in 
 
 #grid(
   columns: (2.2fr, .7fr),
@@ -279,7 +319,7 @@ L'invio tramite `Ssend` sincronizza i processi: una volta completata la trasmiss
 
 == Calcolo elementi dell'intorno e sogliatura
 
-Dopo lo scambio dei dati, ogni processo itera sulla propria porzione di matrice. Si ricorda che:
+- Dopo lo scambio dei dati, ogni processo itera sulla propria porzione di matrice. Si ricorda che:
 
   #table(
     columns: (2.3fr, 2.3fr),
@@ -359,26 +399,49 @@ free(sendcounts); free(senddispls);
 == Considerazioni generali
 
 = Benchmark
+== Setup sperimentale
+- I tempi riportati sono la *media* e la rispettiva *deviazione standard* di 3 misurazioni indipendenti, con $N=10.000$
+
+- Lo *speedup* è stato calcolato utilizzando la formula: $S(P) = T(1) / T(P)$, mentre l'*efficiency* come $E(P) = S(P) / P$
+
+
+
 == MPI
-== Tabella Strong Scaling
-//#generate-scaling-table(mpi_strong, is-weak: false)
-#mpi_table(mpi_strong, mode: "strong")
+=== Strong Scaling
+- Valori calcolati
 
+#scaling_table(mpi_strong)
 
-== Tabella Weak Scaling (Gustafson)
-#mpi_table(mpi_weak, mode: "weak", r: 0.9)
-//#generate-scaling-table(mpi_weak, is-weak: true)
+#align(center)[#image("plot/mpi_strong_comparison.png", width: 80% )]
 
-#align(center)[
+- Il grafico confronta le prestazioni di diverse primitive di comunicazione tra nodi. `MPI_Sendrecv`
+  è più performante nei tempi di esecuzione, ma mostra uno *scaling peggiore*
+  rispetto a `MPI_Send`/`MPI_Recv` e `MPI_Isend`/`MPI_Irecv`.
 
-#image("plot/mpi_strong_comparison.png")
-]
+ 
 
-#align(center)[
+=== Weak Scaling
 
-#image("plot/mpi_weak_comparison.png")
-]
+#scaling_table(mpi_weak)
+
+#align(center)[#image("plot/mpi_weak_comparison.png", width: 80% )]
+
+- Nel caso di *weak scaling* si osserva un comportamento analogo: `MPI_Sendrecv`
+  mantiene tempi di esecuzione inferiori, ma presenta ancora uno *scaling peggiore*
+  rispetto alle altre primitive.
+
 
 == OpenMP
 
-= Conclusioni
+=== Strong Scaling
+
+- Valori calcolati
+
+#scaling_table(omp_weak)
+
+#align(center)[#image("plot/omp_strong.png", width: 80% )]
+
+=== Weak Scaling
+#scaling_table(omp_strong)
+
+#align(center)[#image("plot/omp_weak.png", width: 80% )]
