@@ -78,22 +78,27 @@ int main(int argc, char* argv[]) {
         start_time = omp_get_wtime();
     }
 
+    // for variables declaration
+    int i, j, z, w, count, zmin, zmax, wmin, wmax;
+    float sum;
+
     /* 2. binarization processing (OpenMP) */
-    #pragma omp parallel for num_threads(size) schedule(static) 
-    for (int i = 0; i < n_size; i++) {
-        for (int j = 0; j < n_size; j++) {
+    #pragma omp parallel for num_threads(size) schedule(static) \
+    shared(A, T, n_size) private(i, j, sum, count, zmin, zmax, wmin, wmax, z, w)
+    for (i = 0; i < n_size; i++) {
+        for (j = 0; j < n_size; j++) {
 
             // 2.1 calculate the mean of the neighborhood
-            float sum = 0;
-            int count = 0;
+            sum = 0;
+            count = 0;
 
-            int zmin = (i > 0) ? i - 1 : i;
-            int zmax = (i < n_size - 1) ? i + 1 : i;
-            int wmin = (j > 0) ? j - 1 : j;
-            int wmax = (j < n_size - 1) ? j + 1 : j;
+            zmin = (i > 0) ? i - 1 : i;
+            zmax = (i < n_size - 1) ? i + 1 : i;
+            wmin = (j > 0) ? j - 1 : j;
+            wmax = (j < n_size - 1) ? j + 1 : j;
 
-            for (int z = zmin; z <= zmax; z++) {
-                for (int w = wmin; w <= wmax; w++) {
+            for (z = zmin; z <= zmax; z++) {
+                for (w = wmin; w <= wmax; w++) {
                     sum += A[z][w];
                     count++;
                 }
@@ -102,7 +107,7 @@ int main(int argc, char* argv[]) {
             // 2.2 calculate mean
             T[i][j] = (A[i][j] * count > sum) ? 1 : 0;
         }
-    }
+    }}
 
     /* 3. timing end and print */
     if (benchmark) {
