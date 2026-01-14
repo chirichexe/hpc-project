@@ -8,14 +8,23 @@
 
 int main(int argc, char* argv[]) {
 
-    /* SERIAL */
-    // arguments parsing
+    /* args */
+    // matrix size
     int n_size = N;
+
+    // quiet mode
     int quiet = 0;
+
+    // benchmark mode
     int benchmark = 0;
+
+    // halo exchange mode
     int exchange_mode = 0; // 0 = ssend/recv, 1 = isend/irecv, 2 = sendrecv
+    
+    // seed of the random number generator
     unsigned int seed = (unsigned int)time(NULL);
  
+    /* args check and parsing */
     if (argc > 6) {
         printf("Usage: %s [matriz_size] [seed] [exchange_mode] [-q|--quiet] [-b|--benchmark]\n", argv[0]);
         return EXIT_FAILURE;
@@ -24,7 +33,6 @@ int main(int argc, char* argv[]) {
     int pos = 0; // 0 = size, 1 = seed, 2 =  exchange mode
     for (int k = 1; k < argc; k++) {
 
-        // if quiet flag, no output
         if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
             quiet = 1;
             continue;
@@ -37,55 +45,56 @@ int main(int argc, char* argv[]) {
         long val = strtol(argv[k], &end, 10);
         if (*end != '\0') 
             continue;
-        if (pos == 0) { // first: MATRIX SIZE
+        if (pos == 0) {         // first: MATRIX SIZE
             if (val > 0) 
                 n_size = (int)val;  
         }
-        else if (pos == 1) { // second: SEED
-            seed = (unsigned int)val; 
-        } else if (pos == 2) { // third: HALO MODE
+        else if (pos == 1) {    // second: SEED
+            seed = (unsigned int)val;
+        } 
+        else if (pos == 2) {    // third: HALO MODE
             if (val >=0 && val <=2)
                 exchange_mode = (int)val;
         }
         pos++;
     }
 
-    /* PARALLEL */
+    /* Parallel Section */
     MPI_Init(&argc, &argv);
     int size, my_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    /* Data distribution */
+    /* 1. Data distribution */
     // the minimum number of rows assigned to each process
     int base_rows = n_size / size;
 
     // extra rows to distribute among the first 'extra_rows' processes
     int extra_rows = n_size % size;
 
-    int *A_raw = NULL; // matrix A (only on master)
-    int *T_raw = NULL; // matrix T (only on master)
+    int *A = NULL; // matrix A (only on master)
+    int *T = NULL; // matrix T (only on master)
 
     /* Data structures for Scatterv */
     // it says me how many elements each process will receive
     int *sendcounts = malloc(size * sizeof(int));
     
-    // it says me the displacement (in elements) from the beginning of A_raw for each process
+    // it says me the displacement (in elements) from the beginning of A for each process
     int *senddispls = malloc(size * sizeof(int));
 
     if (my_rank == 0) { /* MASTER */
         
         // allocates and initializes the full matrix A and T
-        A_raw = malloc(n_size * n_size * sizeof(int));
-        T_raw = malloc(n_size * n_size * sizeof(int));
+        A = malloc(n_size * n_size * sizeof(int));
+        T = malloc(n_size * n_size * sizeof(int));
         
-        // seed of the random number generator
+        // initialize the seed of the random number generator
         srand(seed);
 
         // matrix A generation 
         for (int i = 0; i < n_size; i++) {
             for (int j = 0; j < n_size; j++) {
-                A_raw[i * n_size + j] = rand() % 10;
+                A[i * n_size + j] = rand() % 10;
             }
         }
 
@@ -101,7 +110,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Broadcast sendcounts and senddispls to all processes
+    // 2. Broadcast sendcounts and senddispls to all processes
     MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(senddispls, size, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -118,15 +127,15 @@ int main(int argc, char* argv[]) {
         my_T = malloc( sendcounts[my_rank] * sizeof(int));
     }
 
-    /* timing start **************************************/
+    /* TIMING START **********************************************/
     double start, end, local_elaps, global_elaps;
     MPI_Barrier(MPI_COMM_WORLD);
     start = MPI_Wtime();
-    /* timing start **************************************/
-
+    /* TIMING START **********************************************/ 
+    
     /* MASTER: DATA DISTRIBUTION */
     MPI_Scatterv(
-        A_raw, sendcounts, senddispls, MPI_INT,  // send buffers
+        A, sendcounts, senddispls, MPI_INT,  // send buffers
         my_A, (  sendcounts[my_rank] ), MPI_INT, // recv buffer
         0, MPI_COMM_WORLD
     );
@@ -250,30 +259,31 @@ int main(int argc, char* argv[]) {
     /* MASTER: DATA GATHERING */
     MPI_Gatherv(
         my_T, (my_rows * n_size), MPI_INT,      // send buffer
-        T_raw, sendcounts, senddispls, MPI_INT, // recv buffers
+        T, sendcounts, senddispls, MPI_INT, // recv buffers
         0, MPI_COMM_WORLD
     );
 
-    /* timing end **************************************/
+    /* TIMING END **********************************************/
     end = MPI_Wtime();
     local_elaps = end - start;
-    /* timing end **************************************/
-
     MPI_Reduce(&local_elaps, &global_elaps, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    /* TIMING END **********************************************/
 
+    /* Matrix print if not in quiet mode  */
     if (my_rank == 0) {
         if (benchmark) {
             printf("%d,%d,%f\n", size, n_size, global_elaps);
         } else if (!quiet) {
             for (int i = 0; i < n_size; i++) {
                 for (int j = 0; j < n_size ; j++) {
-                    printf("%d ", T_raw[i * n_size + j]);
+                    printf("%d ", T[i * n_size + j]);
                 }
                 printf("\n");
             }
         }
-        free(A_raw);
-        free(T_raw);
+        
+        free(A);
+        free(T);
     }
 
     if (my_rows > 0) {

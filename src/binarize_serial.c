@@ -4,24 +4,28 @@
 #include <string.h>
 
 #define N 2000 /* standard matrix size */
-#define TOT (N * N)
 
 int main( int argc, char* argv[] ) {
     
-    // args parsing
+    /* args */
+    // matrix size
     int n_size = N;
-    int quiet = 0;
+    
+    // seed of the random number generator
     unsigned int seed = (unsigned int)time(NULL);
 
+    // quiet mode
+    int quiet = 0;
+
+    /* args check and parsing */
     if (argc > 4) {
-        fprintf(stderr, "Usage: %s [matrix_size] [seed] [-q|--quiet]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [n_size] [seed] [-q|--quiet]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     int pos = 0; // 0 = size, 1 = seed
     for (int k = 1; k < argc; k++) {
 
-        // if quiet flag, no output
         if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
             quiet = 1;
             continue;
@@ -30,81 +34,80 @@ int main( int argc, char* argv[] ) {
         long val = strtol(argv[k], &end, 10);
         if (*end != '\0') continue; 
 
-        if (pos == 0) { // first: MATRIX SIZE
+        if (pos == 0) {         // first: MATRIX SIZE
             if (val > 0) 
                 n_size = (int)val;
         } 
-        else if (pos == 1) { // second: SEED
+        else if (pos == 1) {    // second: SEED
             seed = (unsigned int)val;
         }
         pos++;
     }
 
     /* Values allocation */
-    int *A_raw = malloc(n_size * n_size * sizeof(int));
-    int *T_raw = malloc(n_size * n_size * sizeof(int));
+    // input matrix A
+    int *A = malloc(n_size * n_size * sizeof *A);
     
-    int (*A)[n_size] = (int (*)[n_size])A_raw; 
-    int (*T)[n_size] = (int (*)[n_size])T_raw; 
+    // output matrix T
+    int *T = malloc(n_size * n_size * sizeof *T);
 
-    int i, j, count;
-    float sum;
-
-    // initialize random seed
-    srand(seed);
-
-    /* Check memory allocation */
+    // Check memory allocation
     if (!A || !T) {
         fprintf(stderr, "Error: Insufficient memory\n");
         return EXIT_FAILURE;
     }
 
-    /* 1. matrix A generation */
+    // variables
+    int i, j, count, zmin, zmax, wmin, wmax, z, w;
+    float sum;
+
+    // initialize random seed
+    srand(seed);
+
+    /* 1. Matrix A generation */
     for (i = 0; i < n_size; i++) {
         for (j = 0; j < n_size; j++) {
-            A[i][j] = rand() % 10;
+            A[i * n_size + j] = rand() % 10;
         }
     }
 
-    /* 2. binarization processing (serial) */
+    /* 2. Binarization processing (serial) */
     for (i = 0; i < n_size; i++) {
         for (j = 0; j < n_size; j++) {
 
-            // 2.1 calculate the mean of the neighborhood
+            // 2.1 Calculate the mean of the neighborhood
             sum = 0;
             count = 0;
 
-            int zmin = (i > 0) ? i - 1 : i;
-            int zmax = (i < n_size - 1) ? i + 1 : i;
-            int wmin = (j > 0) ? j - 1 : j;
-            int wmax = (j < n_size - 1) ? j + 1 : j;
+            zmin = (i > 0) ? i - 1 : i;
+            zmax = (i < n_size - 1) ? i + 1 : i;
+            wmin = (j > 0) ? j - 1 : j;
+            wmax = (j < n_size - 1) ? j + 1 : j;
 
-            for (int z = zmin; z <= zmax; z++) {
-                for (int w = wmin; w <= wmax; w++) {
-                    sum += A[z][w];
+            for ( z = zmin; z <= zmax; z++) {
+                for ( w = wmin; w <= wmax; w++) {
+                    sum += A[z * n_size + w];
                     count++;
                 }
             }
             
-            // 2.2 calculate mean
-            T[i][j] = (A[i][j] * count > sum) ? 1 : 0;
+            // 2.2 Calculate mean
+            T[i * n_size + j] =
+                (A[i * n_size + j] * count > sum) ? 1 : 0;
         }
     }
 
-    /* 3. matrix print if not in quiet mode */
+    /* 3. Matrix print if not in quiet mode */
     if (!quiet) {
         for (i = 0; i < n_size; i++) {
             for (j = 0; j < n_size; j++) {
-                printf("%d ", T[i][j]);
+                printf("%d ", T[i * n_size + j]);
             }
             printf("\n");
         }
     }
-    
-    // confirmation message
-    //printf("Matrix bynarized with success.\n");
 
-    // free memory
+    /* 4. Free memory */
     free(A);
     free(T);
 
