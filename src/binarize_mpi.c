@@ -4,13 +4,13 @@
 #include <time.h>
 #include <string.h>
 
-#define N 2000 /* standard matrix size */
+#define DEFAULT_N 2000 /* standard matrix num_proc */
 
 int main(int argc, char* argv[]) {
 
     /* args */
-    // matrix size
-    int n_size = N;
+    // matrix num_proc
+    int N = DEFAULT_N;
 
     // quiet mode
     int quiet = 0;
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    int pos = 0; // 0 = size, 1 = seed, 2 =  exchange mode
+    int pos = 0; // 0 = num_proc, 1 = seed, 2 =  exchange mode
     for (int k = 1; k < argc; k++) {
 
         if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
             continue;
         if (pos == 0) {         // first: MATRIX SIZE
             if (val > 0) 
-                n_size = (int)val;  
+                N = (int)val;  
         }
         else if (pos == 1) {    // second: SEED
             seed = (unsigned int)val;
@@ -61,62 +61,62 @@ int main(int argc, char* argv[]) {
 
     /* Parallel Section */
     MPI_Init(&argc, &argv);
-    int size, my_rank;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    int num_proc, my_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     /* 1. Data distribution */
     // the minimum number of rows assigned to each process
-    int base_rows = n_size / size;
+    int base_rows = N / num_proc;
 
     // extra rows to distribute among the first 'extra_rows' processes
-    int extra_rows = n_size % size;
+    int extra_rows = N % num_proc;
 
     int *A = NULL; // matrix A (only on master)
     int *T = NULL; // matrix T (only on master)
 
     /* Data structures for Scatterv */
     // it says me how many elements each process will receive
-    int *sendcounts = malloc(size * sizeof(int));
+    int *sendcounts = malloc(num_proc * sizeof(int));
     
     // it says me the displacement (in elements) from the beginning of A for each process
-    int *senddispls = malloc(size * sizeof(int));
+    int *senddispls = malloc(num_proc * sizeof(int));
 
     if (my_rank == 0) { /* MASTER */
         
         // allocates and initializes the full matrix A and T
-        A = malloc(n_size * n_size * sizeof(int));
-        T = malloc(n_size * n_size * sizeof(int));
+        A = malloc(N * N * sizeof(int));
+        T = malloc(N * N * sizeof(int));
         
         // initialize the seed of the random number generator
         srand(seed);
 
         // matrix A generation 
-        for (int i = 0; i < n_size; i++) {
-            for (int j = 0; j < n_size; j++) {
-                A[i * n_size + j] = rand() % 10;
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                A[i * N + j] = rand() % 10;
             }
         }
 
         /* Calculation of sendcounts and senddispls */
         int current_displ = 0;
-        for (int p = 0; p < size; p++) {
+        for (int p = 0; p < num_proc; p++) {
             // distribute extra rows to the first 'extra_rows' processes
             int actual_rows = base_rows + (p < extra_rows ? 1 : 0);
             
-            sendcounts[p] = actual_rows * n_size; 
+            sendcounts[p] = actual_rows * N; 
             senddispls[p] = current_displ;
             current_displ += sendcounts[p];
         }
     }
 
     // 2. Broadcast sendcounts and senddispls to all processes
-    MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(senddispls, size, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(sendcounts, num_proc, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(senddispls, num_proc, MPI_INT, 0, MPI_COMM_WORLD);
 
     /* EACH PROCESS */
     // the number of rows assigned to this process
-    int my_rows = sendcounts[my_rank] / n_size;
+    int my_rows = sendcounts[my_rank] / N;
 
     // local buffers: each process gets its chunk of A and T (only actual rows, no padding)
     int *my_A = NULL;
@@ -142,42 +142,42 @@ int main(int argc, char* argv[]) {
 
     /* 1) neighbor ranks */
     int up   = (my_rank > 0)        ? my_rank - 1 : MPI_PROC_NULL;
-    int down = (my_rank < size - 1) ? my_rank + 1 : MPI_PROC_NULL;
+    int down = (my_rank < num_proc - 1) ? my_rank + 1 : MPI_PROC_NULL;
     int total_rows = my_rows + 2; // two ghost rows (above and below)
 
     // the last process that contains data
-    int last_rank_with_data = size - 1;
+    int last_rank_with_data = num_proc - 1;
     while (last_rank_with_data >= 0 && sendcounts[last_rank_with_data] == 0) {
         last_rank_with_data--;
     }
 
     /* 2) add ghost rows above and below */
-    int *my_A_plus_ghosts = calloc(total_rows * n_size, sizeof(int));
+    int *my_A_plus_ghosts = calloc(total_rows * N, sizeof(int));
     int *upper_ghost = my_A_plus_ghosts;                          // row -1
-    int *local_data  = my_A_plus_ghosts + n_size;                 // rows [0 ... my_rows-1]
-    int *lower_ghost = my_A_plus_ghosts + (my_rows + 1) * n_size; // row + my_rows
+    int *local_data  = my_A_plus_ghosts + N;                 // rows [0 ... my_rows-1]
+    int *lower_ghost = my_A_plus_ghosts + (my_rows + 1) * N; // row + my_rows
 
     /* copy local block into the central part of the buffer */
     if (my_rows > 0) {
-        memcpy(local_data, my_A, my_rows * n_size * sizeof(int));
+        memcpy(local_data, my_A, my_rows * N * sizeof(int));
     }
 
     /* 2) Halo exchange rows */
     // if i have no rows (my_rows==0), no data to send else, the 
     // offset of the last row to send is the last row of my local data
-    int send_down_offset = (my_rows > 0 ? (my_rows - 1) * n_size : 0);
+    int send_down_offset = (my_rows > 0 ? (my_rows - 1) * N : 0);
 
     if (exchange_mode == 0) {
         // SSend / Recv version ********************************************************************
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Ssend(local_data, n_size, MPI_INT, up, 100, MPI_COMM_WORLD);
-            MPI_Recv(upper_ghost, n_size, MPI_INT, up, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Ssend(local_data, N, MPI_INT, up, 100, MPI_COMM_WORLD);
+            MPI_Recv(upper_ghost, N, MPI_INT, up, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     
-        if (my_rank < size - 1 && my_rows > 0) {
+        if (my_rank < num_proc - 1 && my_rows > 0) {
             if (sendcounts[down] > 0) {
-                MPI_Recv(lower_ghost, n_size, MPI_INT, down, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                MPI_Ssend(local_data + send_down_offset, n_size, MPI_INT, down, 200, MPI_COMM_WORLD);
+                MPI_Recv(lower_ghost, N, MPI_INT, down, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Ssend(local_data + send_down_offset, N, MPI_INT, down, 200, MPI_COMM_WORLD);
             }
         }
     } else if (exchange_mode == 1) { 
@@ -187,18 +187,18 @@ int main(int argc, char* argv[]) {
     
         // receive first
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Irecv(upper_ghost, n_size, MPI_INT, up, 200, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Irecv(upper_ghost, N, MPI_INT, up, 200, MPI_COMM_WORLD, &requests[req_count++]);
         }
-        if (my_rank < size - 1 && my_rows > 0 && sendcounts[down] > 0) {
-            MPI_Irecv(lower_ghost, n_size, MPI_INT, down, 100, MPI_COMM_WORLD, &requests[req_count++]);
+        if (my_rank < num_proc - 1 && my_rows > 0 && sendcounts[down] > 0) {
+            MPI_Irecv(lower_ghost, N, MPI_INT, down, 100, MPI_COMM_WORLD, &requests[req_count++]);
         }
     
         // send after
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Isend(local_data, n_size, MPI_INT, up, 100, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Isend(local_data, N, MPI_INT, up, 100, MPI_COMM_WORLD, &requests[req_count++]);
         }
-        if (my_rank < size - 1 && my_rows > 0 && sendcounts[down] > 0) {
-            MPI_Isend(local_data + send_down_offset, n_size, MPI_INT, down, 200, MPI_COMM_WORLD, &requests[req_count++]);
+        if (my_rank < num_proc - 1 && my_rows > 0 && sendcounts[down] > 0) {
+            MPI_Isend(local_data + send_down_offset, N, MPI_INT, down, 200, MPI_COMM_WORLD, &requests[req_count++]);
         }
     
         // wait for all to complete
@@ -208,13 +208,13 @@ int main(int argc, char* argv[]) {
     } else if (exchange_mode == 2) {
         // Sendrecv version ********************************************************************
         // Exchange from UP: send my first row, receive the row above me
-        MPI_Sendrecv(local_data, n_size, MPI_INT, up, 100,
-                    upper_ghost, n_size, MPI_INT, up, 200,
+        MPI_Sendrecv(local_data, N, MPI_INT, up, 100,
+                    upper_ghost, N, MPI_INT, up, 200,
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
         // Exchange from DOWN: send my last row, receive the row below me
-        MPI_Sendrecv(local_data + send_down_offset, n_size, MPI_INT, down, 200,
-                    lower_ghost, n_size, MPI_INT, down, 100,
+        MPI_Sendrecv(local_data + send_down_offset, N, MPI_INT, down, 200,
+                    lower_ghost, N, MPI_INT, down, 100,
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } 
     
@@ -222,7 +222,7 @@ int main(int argc, char* argv[]) {
 
     /* 3. Parallel processing (each process on its local domain) */
     for (int i = 0; i < my_rows; i++) { // handles only valid rows
-        for (int j = 0; j < n_size; j++) {
+        for (int j = 0; j < N; j++) {
 
             // initialize accumulators
             int sum = 0; // sum of the neighborhood values
@@ -235,7 +235,7 @@ int main(int argc, char* argv[]) {
 
             // horizontal
             int wmin = (j > 0) ? -1 : 0; // left boundary
-            int wmax = (j < n_size - 1) ? 1 : 0; // right boundary
+            int wmax = (j < N - 1) ? 1 : 0; // right boundary
 
             /* 3.2 scan the 3x3 neighborhood */
             for (int dz = zmin; dz <= zmax; dz++) { // vertical offset
@@ -244,13 +244,13 @@ int main(int argc, char* argv[]) {
                 for (int dw = wmin; dw <= wmax; dw++) { // horizontal offset
                     int colIndex = j + dw;
 
-                    sum += my_A_plus_ghosts[rowIndex * n_size + colIndex];
+                    sum += my_A_plus_ghosts[rowIndex * N + colIndex];
                     count++;
                 }
             }
 
             /* 3.5 thresholding operation */
-            my_T[i * n_size + j] = (local_data[i * n_size + j] * count > sum) ? 1 : 0;
+            my_T[i * N + j] = (local_data[i * N + j] * count > sum) ? 1 : 0;
         }
     }
 
@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
 
     /* MASTER: DATA GATHERING */
     MPI_Gatherv(
-        my_T, (my_rows * n_size), MPI_INT,      // send buffer
+        my_T, (my_rows * N), MPI_INT,      // send buffer
         T, sendcounts, senddispls, MPI_INT, // recv buffers
         0, MPI_COMM_WORLD
     );
@@ -272,11 +272,11 @@ int main(int argc, char* argv[]) {
     /* Matrix print if not in quiet mode  */
     if (my_rank == 0) {
         if (benchmark) {
-            printf("%d,%d,%f\n", size, n_size, global_elaps);
+            printf("%d,%d,%f\n", num_proc, N, global_elaps);
         } else if (!quiet) {
-            for (int i = 0; i < n_size; i++) {
-                for (int j = 0; j < n_size ; j++) {
-                    printf("%d ", T[i * n_size + j]);
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N ; j++) {
+                    printf("%d ", T[i * N + j]);
                 }
                 printf("\n");
             }

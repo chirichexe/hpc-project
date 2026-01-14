@@ -3,13 +3,13 @@
 #include <time.h>
 #include <string.h>
 
-#define N 2000 /* standard matrix size */
+#define DEFAULT_N 2000 /* standard matrix size */
 
 int main( int argc, char* argv[] ) {
     
     /* args */
     // matrix size
-    int n_size = N;
+    int N = DEFAULT_N;
     
     // seed of the random number generator
     unsigned int seed = (unsigned int)time(NULL);
@@ -19,7 +19,7 @@ int main( int argc, char* argv[] ) {
 
     /* args check and parsing */
     if (argc > 4) {
-        fprintf(stderr, "Usage: %s [n_size] [seed] [-q|--quiet]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [N] [seed] [-q|--quiet]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -36,7 +36,7 @@ int main( int argc, char* argv[] ) {
 
         if (pos == 0) {         // first: MATRIX SIZE
             if (val > 0) 
-                n_size = (int)val;
+                N = (int)val;
         } 
         else if (pos == 1) {    // second: SEED
             seed = (unsigned int)val;
@@ -46,10 +46,10 @@ int main( int argc, char* argv[] ) {
 
     /* Values allocation */
     // input matrix A
-    int *A = malloc(n_size * n_size * sizeof *A);
+    int *A = malloc(N * N * sizeof *A);
     
     // output matrix T
-    int *T = malloc(n_size * n_size * sizeof *T);
+    int *T = malloc(N * N * sizeof *T);
 
     // Check memory allocation
     if (!A || !T) {
@@ -65,43 +65,43 @@ int main( int argc, char* argv[] ) {
     srand(seed);
 
     /* 1. Matrix A generation */
-    for (i = 0; i < n_size; i++) {
-        for (j = 0; j < n_size; j++) {
-            A[i * n_size + j] = rand() % 10;
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            A[i * N + j] = rand() % 10;
         }
     }
 
     /* 2. Binarization processing (serial) */
-    for (i = 0; i < n_size; i++) {
-        for (j = 0; j < n_size; j++) {
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
 
             // 2.1 Calculate the mean of the neighborhood
             sum = 0;
             count = 0;
 
             zmin = (i > 0) ? i - 1 : i;
-            zmax = (i < n_size - 1) ? i + 1 : i;
+            zmax = (i < N - 1) ? i + 1 : i;
             wmin = (j > 0) ? j - 1 : j;
-            wmax = (j < n_size - 1) ? j + 1 : j;
+            wmax = (j < N - 1) ? j + 1 : j;
 
             for ( z = zmin; z <= zmax; z++) {
                 for ( w = wmin; w <= wmax; w++) {
-                    sum += A[z * n_size + w];
+                    sum += A[z * N + w];
                     count++;
                 }
             }
             
             // 2.2 Calculate mean
-            T[i * n_size + j] =
-                (A[i * n_size + j] * count > sum) ? 1 : 0;
+            T[i * N + j] =
+                (A[i * N + j] * count > sum) ? 1 : 0;
         }
     }
 
     /* 3. Matrix print if not in quiet mode */
     if (!quiet) {
-        for (i = 0; i < n_size; i++) {
-            for (j = 0; j < n_size; j++) {
-                printf("%d ", T[i * n_size + j]);
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                printf("%d ", T[i * N + j]);
             }
             printf("\n");
         }

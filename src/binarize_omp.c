@@ -4,16 +4,16 @@
 #include <string.h>
 #include <omp.h>
 
-#define N 2000 /* standard matrix size */
+#define DEFAULT_N 2000 /* standard matrix num_threads */
 
 int main(int argc, char* argv[]) {
     
     /* args */
-    // matrix size
-    int n_size = N;
+    // matrix num_threads
+    int N = DEFAULT_N; 
     
     // number of threads
-    int size = 0;
+    int num_threads = 0;
 
     // quiet mode
     int quiet = 0;
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     
-    int pos = 0; // 0 = num threads, 1 = size, 2 = seed
+    int pos = 0; // 0 = num threads, 1 = num_threads, 2 = seed
     for (int k = 1; k < argc; k++) {
 
         if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {
@@ -47,11 +47,11 @@ int main(int argc, char* argv[]) {
             continue;
         if (pos == 0) {         // first: NUM THREADS
             if (val > 0) 
-                size = (int)val;  
+                num_threads = (int)val;  
         }
         if (pos == 1) {         // second: MATRIX SIZE
             if (val > 0) 
-                n_size = (int)val;  
+                N = (int)val;  
         }
         else if (pos == 2) {    // third: SEED
             seed = (unsigned int)val; 
@@ -61,10 +61,10 @@ int main(int argc, char* argv[]) {
 
     /* Values allocation */
     // input matrix A
-    int *A = malloc(n_size * n_size * sizeof *A);
+    int *A = malloc(N * N * sizeof *A);
     
     // output matrix T
-    int *T = malloc(n_size * n_size * sizeof *T);
+    int *T = malloc(N * N * sizeof *T);
 
     // Check memory allocation
     if (!A || !T) {
@@ -82,9 +82,9 @@ int main(int argc, char* argv[]) {
     }
 
     /* 1. Matrix A generation */
-    for (int i = 0; i < n_size; i++) {
-        for (int j = 0; j < n_size; j++) {
-            A[i * n_size + j] = rand() % 10;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            A[i * N + j] = rand() % 10;
         }
     }
 
@@ -101,29 +101,29 @@ int main(int argc, char* argv[]) {
     float sum;
 
     /* 2. binarization processing (OpenMP) */
-    #pragma omp parallel for num_threads(size) schedule(static) \
-    shared(A, T, n_size) private(i, j, sum, count, zmin, zmax, wmin, wmax, z, w)
-    for (i = 0; i < n_size; i++) {
-        for (j = 0; j < n_size; j++) {
+    #pragma omp parallel for num_threads(num_threads) schedule(static) \
+    shared(A, T, N) private(i, j, sum, count, zmin, zmax, wmin, wmax, z, w)
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
 
             // 2.1 calculate the mean of the neighborhood
             sum = 0;
             count = 0;
 
             zmin = (i > 0) ? i - 1 : i;
-            zmax = (i < n_size - 1) ? i + 1 : i;
+            zmax = (i < N - 1) ? i + 1 : i;
             wmin = (j > 0) ? j - 1 : j;
-            wmax = (j < n_size - 1) ? j + 1 : j;
+            wmax = (j < N - 1) ? j + 1 : j;
 
             for (z = zmin; z <= zmax; z++) {
                 for (w = wmin; w <= wmax; w++) {
-                    sum += A[z * n_size + w];
+                    sum += A[z * N + w];
                     count++;
                 }
             }
             
             // 2.2 Calculate mean
-            T[i * n_size + j] = (A[i * n_size + j] * count > sum) ? 1 : 0;
+            T[i * N + j] = (A[i * N + j] * count > sum) ? 1 : 0;
         }
     }
 
@@ -131,16 +131,16 @@ int main(int argc, char* argv[]) {
     if (benchmark) {
         end = omp_get_wtime();
         double elapsed = end - start_time;
-        printf("%d,%d,%f\n", size, n_size, elapsed);
+        printf("%d,%d,%f\n", num_threads, N, elapsed);
     }
     /* TIMING END **********************************************/
 
 
     /* 3. Matrix print if not in quiet mode */
     if (!quiet) {
-        for (int i = 0; i < n_size; i++) {
-            for (int j = 0; j < n_size; j++) {
-                printf("%d ", T[i * n_size + j]);
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                printf("%d ", T[i * N + j]);
             }
             printf("\n");
         }
