@@ -8,7 +8,7 @@ OPENMP_BIN="./bin/binarize_omp"
 # program parameters
 SEED=42 # same seed 
 SIZE=1234
-NUM_PROCS=4
+NUM_PROCS=7
 
 # temporary output files
 OUT_SERIAL=".tmp_serial.out"

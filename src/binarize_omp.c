@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     
-    int pos = 0; // 0 = num threads, 1 = num_threads, 2 = seed
+    int pos = 0; // 0 = num threads, 1 = N, 2 = seed
     for (int k = 1; k < argc; k++) {
 
         if (strcmp(argv[k], "-q") == 0 || strcmp(argv[k], "--quiet") == 0) {

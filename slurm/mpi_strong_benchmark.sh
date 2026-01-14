@@ -1,30 +1,34 @@
 #!/bin/bash
 #SBATCH --account=tra25_IngInfBo
 #SBATCH --partition=g100_usr_prod
-#SBATCH -t 00:20:00
+#SBATCH --time=00:20:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=48
-#SBATCH -o strong_scaling.out
+#SBATCH --ntasks-per-node=48
+#SBATCH --output=weak_scaling_mpi.out
 
 EXCHANGE_MODE=$1
-
 if [ -z "$EXCHANGE_MODE" ]; then
     EXCHANGE_MODE=0
 fi
 
 EXEC="./bin/binarize_mpi"
 SEED=1234
-N=10000
 RESULTS_DIR="./results"
 
-mkdir -p $RESULTS_DIR
+mkdir -p "$RESULTS_DIR"
 
-echo "Run,P,N,Time" > $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
+TASKS=(1 2 4 8 12 16 20 24 48)
+SIZES=(5000 7071 10000 14142 17320 20000 22360 24494 34641)
 
-# Ciclo sul numero di processi
-for P in 1 2 4 8 12 16 20 24 48 ; do
-    for i in {1..3}; do
-        RESULT=$(srun -n $P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
-        echo "$i,$RESULT" >> $RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv
+echo "Run,P,N,Time" > "$RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv"
+
+for i in "${!TASKS[@]}"; do
+    P=${TASKS[$i]}
+    N=${SIZES[$i]}
+
+    for run in {1..3}; do
+        RESULT=$(srun --ntasks=$P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
+        echo "$run,$RESULT" >> "$RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv"
     done
 done

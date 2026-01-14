@@ -119,48 +119,36 @@ int main(int argc, char* argv[]) {
     int my_rows = sendcounts[my_rank] / N;
 
     // local buffers: each process gets its chunk of A and T (only actual rows, no padding)
-    int *my_A = NULL;
     int *my_T = NULL;
     
     if (my_rows > 0) {
-        my_A = malloc( sendcounts[my_rank] * sizeof(int));
         my_T = malloc( sendcounts[my_rank] * sizeof(int));
     }
+
+    /* 1) neighbor ranks */
+    int up   = (my_rank > 0)        ? my_rank - 1 : MPI_PROC_NULL;
+    int down = (my_rank < num_proc - 1) ? my_rank + 1 : MPI_PROC_NULL;
+    
+    /* 2) add ghost rows above and below */
+    int total_rows = my_rows + 2; // two ghost rows (above and below)
+
+    int *my_A_plus_ghosts = calloc(total_rows * N, sizeof(int));
+    int *upper_ghost = my_A_plus_ghosts;                     // row -1
+    int *local_data  = my_A_plus_ghosts + N;                 // rows [0 ... my_rows-1]
+    int *lower_ghost = my_A_plus_ghosts + (my_rows + 1) * N; // row + my_rows
 
     /* TIMING START **********************************************/
     double start, end, local_elaps, global_elaps;
     MPI_Barrier(MPI_COMM_WORLD);
     start = MPI_Wtime();
-    /* TIMING START **********************************************/ 
+    /* TIMING START **********************************************/
     
     /* MASTER: DATA DISTRIBUTION */
     MPI_Scatterv(
-        A, sendcounts, senddispls, MPI_INT,  // send buffers
-        my_A, (  sendcounts[my_rank] ), MPI_INT, // recv buffer
+        A, sendcounts, senddispls, MPI_INT,
+        local_data, sendcounts[my_rank], MPI_INT,
         0, MPI_COMM_WORLD
     );
-
-    /* 1) neighbor ranks */
-    int up   = (my_rank > 0)        ? my_rank - 1 : MPI_PROC_NULL;
-    int down = (my_rank < num_proc - 1) ? my_rank + 1 : MPI_PROC_NULL;
-    int total_rows = my_rows + 2; // two ghost rows (above and below)
-
-    // the last process that contains data
-    int last_rank_with_data = num_proc - 1;
-    while (last_rank_with_data >= 0 && sendcounts[last_rank_with_data] == 0) {
-        last_rank_with_data--;
-    }
-
-    /* 2) add ghost rows above and below */
-    int *my_A_plus_ghosts = calloc(total_rows * N, sizeof(int));
-    int *upper_ghost = my_A_plus_ghosts;                          // row -1
-    int *local_data  = my_A_plus_ghosts + N;                 // rows [0 ... my_rows-1]
-    int *lower_ghost = my_A_plus_ghosts + (my_rows + 1) * N; // row + my_rows
-
-    /* copy local block into the central part of the buffer */
-    if (my_rows > 0) {
-        memcpy(local_data, my_A, my_rows * N * sizeof(int));
-    }
 
     /* 2) Halo exchange rows */
     // if i have no rows (my_rows==0), no data to send else, the 
@@ -231,7 +219,7 @@ int main(int argc, char* argv[]) {
             /* 3.1 neighborhood  bounds */
             // vertical 
             int zmin = (i == 0 && my_rank == 0) ? 0 : -1; // top boundary
-            int zmax = (i == my_rows - 1 && my_rank == last_rank_with_data) ? 0 : 1; // bottom boundary
+            int zmax = (i == my_rows - 1 && my_rank == num_proc - 1) ? 0 : 1; // bottom boundary
 
             // horizontal
             int wmin = (j > 0) ? -1 : 0; // left boundary
@@ -287,7 +275,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (my_rows > 0) {
-        free(my_A);
         free(my_T);
     }
 
