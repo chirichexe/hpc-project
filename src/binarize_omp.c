@@ -115,8 +115,8 @@ int main(int argc, char* argv[]) {
             wmin = (j > 0) ? j - 1 : j;
             wmax = (j < n_size - 1) ? j + 1 : j;
 
-            for (int z = zmin; z <= zmax; z++) {
-                for (int w = wmin; w <= wmax; w++) {
+            for (z = zmin; z <= zmax; z++) {
+                for (w = wmin; w <= wmax; w++) {
                     sum += A[z * n_size + w];
                     count++;
                 }
