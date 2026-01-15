@@ -40,13 +40,13 @@ def plot_single_scaling(stats, title, filename, is_weak):
 
     # Creazione figura 16:9 con due sottografici
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
-    fig.suptitle(title, fontsize=18, fontweight='bold')
+    #fig.suptitle(title, fontsize=18, fontweight='bold')
 
     # --- 1. Sottografico del Tempo ---
     ax1.errorbar(stats['P'], stats['mean'], yerr=stats['std'], 
                 fmt='-o', capsize=5, color='#1f77b4', label='Tempo misurato')
     
-    ax1.set_xlabel('Numero di Processi (P)', fontsize=12)
+    ax1.set_xlabel('Numero di Nodi (P)', fontsize=12)
     ax1.set_ylabel('Tempo (s)', fontsize=12)
     ax1.set_title('Andamento Tempi', fontsize=14)
     ax1.grid(True, which="both", ls="-", alpha=0.5)
@@ -61,7 +61,7 @@ def plot_single_scaling(stats, title, filename, is_weak):
     p_min = stats['P'].min()
     ax2.plot([p_min, max_p], [1, max_p/p_min], '--', color='gray', label='Ideale')
     
-    ax2.set_xlabel('Numero di Processi (P)', fontsize=12)
+    ax2.set_xlabel('Numero di Nodi (P)', fontsize=12)
     ax2.set_ylabel('Speedup', fontsize=12)
     ax2.set_title('Andamento Speedup', fontsize=14)
     ax2.grid(True, which="both", ls="-", alpha=0.5)
