@@ -5,6 +5,8 @@
 #include <string.h>
 
 #define DEFAULT_N 2000 /* standard matrix num_proc */
+#define UP_TAG 100
+#define DOWN_TAG 200
 
 int main(int argc, char* argv[]) {
 
@@ -158,14 +160,14 @@ int main(int argc, char* argv[]) {
     if (exchange_mode == 0) {
         // SSend / Recv version ********************************************************************
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Ssend(local_data, N, MPI_INT, up, 100, MPI_COMM_WORLD);
-            MPI_Recv(upper_ghost, N, MPI_INT, up, 200, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Ssend(local_data, N, MPI_INT, up, UP_TAG, MPI_COMM_WORLD);
+            MPI_Recv(upper_ghost, N, MPI_INT, up, DOWN_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     
         if (my_rank < num_proc - 1 && my_rows > 0) {
             if (sendcounts[down] > 0) {
-                MPI_Recv(lower_ghost, N, MPI_INT, down, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                MPI_Ssend(local_data + send_down_offset, N, MPI_INT, down, 200, MPI_COMM_WORLD);
+                MPI_Recv(lower_ghost, N, MPI_INT, down, UP_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Ssend(local_data + send_down_offset, N, MPI_INT, down, DOWN_TAG, MPI_COMM_WORLD);
             }
         }
     } else if (exchange_mode == 1) { 
@@ -175,18 +177,18 @@ int main(int argc, char* argv[]) {
     
         // receive first
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Irecv(upper_ghost, N, MPI_INT, up, 200, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Irecv(upper_ghost, N, MPI_INT, up, DOWN_TAG, MPI_COMM_WORLD, &requests[req_count++]);
         }
         if (my_rank < num_proc - 1 && my_rows > 0 && sendcounts[down] > 0) {
-            MPI_Irecv(lower_ghost, N, MPI_INT, down, 100, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Irecv(lower_ghost, N, MPI_INT, down, UP_TAG, MPI_COMM_WORLD, &requests[req_count++]);
         }
     
         // send after
         if (my_rank > 0 && my_rows > 0) {
-            MPI_Isend(local_data, N, MPI_INT, up, 100, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Isend(local_data, N, MPI_INT, up, UP_TAG, MPI_COMM_WORLD, &requests[req_count++]);
         }
         if (my_rank < num_proc - 1 && my_rows > 0 && sendcounts[down] > 0) {
-            MPI_Isend(local_data + send_down_offset, N, MPI_INT, down, 200, MPI_COMM_WORLD, &requests[req_count++]);
+            MPI_Isend(local_data + send_down_offset, N, MPI_INT, down, DOWN_TAG, MPI_COMM_WORLD, &requests[req_count++]);
         }
     
         // wait for all to complete
@@ -196,13 +198,13 @@ int main(int argc, char* argv[]) {
     } else if (exchange_mode == 2) {
         // Sendrecv version ********************************************************************
         // Exchange from UP: send my first row, receive the row above me
-        MPI_Sendrecv(local_data, N, MPI_INT, up, 100,
-                    upper_ghost, N, MPI_INT, up, 200,
+        MPI_Sendrecv(local_data, N, MPI_INT, up, UP_TAG,
+                    upper_ghost, N, MPI_INT, up, DOWN_TAG,
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
         // Exchange from DOWN: send my last row, receive the row below me
-        MPI_Sendrecv(local_data + send_down_offset, N, MPI_INT, down, 200,
-                    lower_ghost, N, MPI_INT, down, 100,
+        MPI_Sendrecv(local_data + send_down_offset, N, MPI_INT, down, DOWN_TAG,
+                    lower_ghost, N, MPI_INT, down, UP_TAG,
                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } 
     
