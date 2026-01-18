@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=48
 #SBATCH --ntasks-per-node=48
-#SBATCH --output=strong_scaling_mpi.out
+#SBATCH --output=weak_scaling_mpi.out
 
 EXCHANGE_MODE=$1
 if [ -z "$EXCHANGE_MODE" ]; then
@@ -14,17 +14,21 @@ fi
 
 EXEC="./bin/binarize_mpi"
 SEED=1234
-N=10000
 RESULTS_DIR="./results"
 
 mkdir -p "$RESULTS_DIR"
 
-echo "Run,P,N,Time" > "$RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv"
+TASKS=(1 2 4 8 12 16 20 24 48)
+SIZES=(5000 7071 10000 14142 17320 20000 22360 24494 34641)
 
-# Strong scaling MPI intra-nodo
-for P in 1 2 4 8 12 16 20 24 48; do
-    for i in {1..3}; do
+echo "Run,P,N,Time" > "$RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv"
+
+for i in "${!TASKS[@]}"; do
+    P=${TASKS[$i]}
+    N=${SIZES[$i]}
+
+    for run in {1..3}; do
         RESULT=$(srun --ntasks=$P $EXEC $N $SEED $EXCHANGE_MODE -b -q)
-        echo "$i,$RESULT" >> "$RESULTS_DIR/strong_mpi_results_${EXCHANGE_MODE}.csv"
+        echo "$run,$RESULT" >> "$RESULTS_DIR/weak_mpi_results_${EXCHANGE_MODE}.csv"
     done
 done
